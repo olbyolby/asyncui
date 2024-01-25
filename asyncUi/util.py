@@ -1,4 +1,4 @@
-from typing import cast, Generic, TypeVar, TypeVar, overload, Type, Self
+from typing import Union, cast, Generic, TypeVar, TypeVar, overload, Type, Self
 from types import EllipsisType
 
 T = TypeVar('T')
@@ -33,3 +33,4 @@ class Placeholder(Generic[T]):
     def __set__(self, instance: T2, value: T | EllipsisType) -> None:
         assert self.name is not None
         setattr(instance, self.name, value)
+Inferable = Union[T, EllipsisType]

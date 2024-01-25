@@ -5,12 +5,13 @@ import warnings
 import inspect
 import functools
 import traceback
-from typing import Generic, Callable, TypeVar, cast, Type, Any, TypeVarTuple, Self, overload, Coroutine, Generator, Never, get_type_hints as getTypeHints
+from typing import Awaitable, Generic, Callable, TypeVar, cast, Type, Any, TypeVarTuple, Self, overload, Coroutine, Generator, Never, get_type_hints as getTypeHints
 from . import events
 from contextvars import Context
 from dataclasses import dataclass
 from threading import Lock
 from types import EllipsisType, TracebackType
+from functools import singledispatch
 
 import logging
 logger = logging.getLogger(__name__)
@@ -21,6 +22,9 @@ T2 = TypeVar('T2')
 Ts = TypeVarTuple('Ts')
 EventT = TypeVar("EventT", bound=events.Event)
 
+
+def asyncHandler(handler: Callable[[*Ts], None | Awaitable[None]]) -> Callable[[*Ts, None | Awaitable[None]]]:
+    
 class EventHandler(Generic[EventT]):
     def __init__(self, function: Callable[[EventT], None], eventType: Type[EventT] | None = None):
         self.function = function
@@ -92,7 +96,7 @@ def eventHandler(eventType: Type[EventT] | Callable[[EventT], None]) -> Callable
     else:
         return EventHandler(eventType)
 
-class BoundEventHandler(Generic[T, EventT]):
+class MethodEventHandler(Generic[T, EventT]):
     def __init__(self, eventHandler: Callable[[T, EventT], None], eventType: Type[EventT]):
         self.eventType = eventType
         self.eventHandler = eventHandler
@@ -113,8 +117,48 @@ class BoundEventHandler(Generic[T, EventT]):
         setattr(instance, self.name, handler)
         return handler  
     
+@overload
+def eventHandlerMethod(eventType: Type[EventT], /) -> Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:  ...
 
+@overload
+def eventHandlerMethod(handler: Callable[[T, EventT], None], /) -> MethodEventHandler[T, EventT]: ...
 
+def eventHandlerMethod(handlerOrType: Type[EventT] | Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT] | Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:
+    if isinstance(handlerOrType, type):
+        eventType = handlerOrType
+        def _inner(handler:Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT]:
+            return MethodEventHandler(handler, eventType)
+        return _inner
+    else:
+        handler = handlerOrType
+
+        if not inspect.isfunction(handler):
+            raise ValueError("A event handler method must be a python function for event type inference(Callable objects are not allowed)")
+
+        signature = inspect.signature(handler)
+        
+        arguments = signature.parameters
+        if len(arguments) != 2:
+            raise ValueError("A event handler method must have exactly 2 positional arguments for event type inference(No *args or keyword arguments)")
+
+        eventArgument = list(arguments.keys())[1]
+
+        argumentTypes = getTypeHints(handler)
+        if eventArgument not in argumentTypes:
+            raise ValueError("The 2nd argument of an event handler method must have a valid type annotation for event type inference")
+        
+        eventType = argumentTypes[eventArgument]
+        if not isinstance(eventType, type):
+            raise ValueError(f"annotated type {eventType!r} is not a valid event type for an event method handler")
+        if not issubclass(eventType, events.Event):
+            raise ValueError(f"inferred/annotated type {eventType!r} is an invalid event type(It must be a subclass of events.Event)")
+        
+        return MethodEventHandler(handler, eventType)
+    
+def asyncCallback(handler: Callable[[EventT], Awaitable[None]]) -> Callable[[EventT], None]:
+    def _wrapper(event: EventT) -> None:
+        asyncio.ensure_future(handler(event))
+    return _wrapper
 
 class TimerList:
     """
@@ -218,6 +262,17 @@ class Window(asyncio.AbstractEventLoop):
     def postEvent(self, eventType: EventT) -> None:
         pygame.event.post(events.toPygameEvent(eventType))
     
+
+    #aync event handling
+    def getEvent(self, eventType: Type[EventT]) -> Awaitable[EventT]:
+        eventFuture = asyncio.Future[EventT]()
+        def eventHook(event: EventT) -> None:
+            eventFuture.set_result(event)
+            self.unregisterEventHandler(eventType, eventHook)
+        self.registerEventHandler(eventType, eventHook)
+        return eventFuture
+
+
 
     # Scheduling callbacks for asyncio
     def callSoon(self, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.Handle:
