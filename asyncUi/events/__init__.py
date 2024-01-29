@@ -6,8 +6,8 @@ class EventTypeMeta(type):
     type: int
     def __init__(self, name: str, bases: tuple['EventTypeMeta', ...], attrs: dict[str, object]):
         if 'type' not in attrs:
-            attrs['type'] = pygame.event.custom_type()
-        if not isinstance(attrs['type'], int):
+            self.type = pygame.event.custom_type()
+        if not isinstance(self.type, int):
             raise RuntimeError(f'Event type {name} has an invalid ".type" attribute(it must be an integer)') 
         
         super().__init__(name, bases, attrs)

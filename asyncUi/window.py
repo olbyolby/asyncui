@@ -23,8 +23,7 @@ Ts = TypeVarTuple('Ts')
 EventT = TypeVar("EventT", bound=events.Event)
 
 
-def asyncHandler(handler: Callable[[*Ts], None | Awaitable[None]]) -> Callable[[*Ts, None | Awaitable[None]]]:
-    
+
 class EventHandler(Generic[EventT]):
     def __init__(self, function: Callable[[EventT], None], eventType: Type[EventT] | None = None):
         self.function = function
@@ -155,10 +154,6 @@ def eventHandlerMethod(handlerOrType: Type[EventT] | Callable[[T, EventT], None]
         
         return MethodEventHandler(handler, eventType)
     
-def asyncCallback(handler: Callable[[EventT], Awaitable[None]]) -> Callable[[EventT], None]:
-    def _wrapper(event: EventT) -> None:
-        asyncio.ensure_future(handler(event))
-    return _wrapper
 
 class TimerList:
     """
@@ -203,7 +198,9 @@ class TimerList:
                 Window().postEvent(ExacuteCallbackEvent(timer))
         for timer in deadTimers:
             self.timers.remove(timer)
-
+    def cancel(self, timer: asyncio.TimerHandle) -> None:
+        if timer in self.timers:
+            self.timers.remove(timer)
 @dataclass
 class ExacuteCallbackEvent(events.Event):
     """
@@ -236,9 +233,10 @@ class Window(asyncio.AbstractEventLoop):
         self.window = window
         self.eventHandlers: dict[int, set[Callable[[Any], None]]] = {}
         self.timers = TimerList()
+        self.orginalSize = window.get_size()
 
         self.registerEventHandler(ExacuteCallbackEvent, self._run_exacute_callback)
-
+        self.registerEventHandler(events.VideoResize, self._resizeHandler)
 
         self.errorHandler: Callable[['Window', dict[Any, Any]], None] | None = None
         asyncio._set_running_loop(self)
@@ -272,7 +270,10 @@ class Window(asyncio.AbstractEventLoop):
         self.registerEventHandler(eventType, eventHook)
         return eventFuture
 
-
+    # Renderering
+    def _resizeHandler(self, event: events.VideoResize) -> None:
+        newHeight = event.w * (self.orginalSize[1] / self.orginalSize[0])
+        pygame.display.set_mode((event.w, newHeight), self.window.get_flags())
 
     # Scheduling callbacks for asyncio
     def callSoon(self, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.Handle:
@@ -291,10 +292,11 @@ class Window(asyncio.AbstractEventLoop):
     def callAt(self, when: float, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.TimerHandle:
         handle = asyncio.TimerHandle(when, callback, args, self, context)
         self.timers.append(handle)
-        print("Da?")
         return handle
     call_at = callAt #type: ignore #Same reason as callSoon
 
+    def _timer_handle_cancelled(self, timer: asyncio.TimerHandle) -> None:
+        self.timers.cancel(timer)
     # Time
     def time(self) -> float:
         return time.monotonic()

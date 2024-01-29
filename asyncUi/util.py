@@ -9,7 +9,7 @@ __all__ = ('Placeholder')
 class Placeholder(Generic[T]):
     def __init__(self, name: str | None = None):
         self.name: str | None = name
-    def __set_name__(self, name: str, owner: Type[T2]) -> None:
+    def __set_name__(self, owner: Type[T2], name: str) -> None:
         self.name = "_" + name
         self.attrName = name
     
