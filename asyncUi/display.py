@@ -1,6 +1,6 @@
 import pygame
 from abc import ABC, abstractmethod
-from typing import Self, NamedTuple
+from typing import Self, NamedTuple, Iterable
 from .util import Placeholder
 from .resources import fonts
 
@@ -34,3 +34,5 @@ class Scale:
         return self.point(size)
     def fontSize(self, size: int) -> int:
         return int(self.scaleFactor * size)
+    def polygon(self, polygon: Iterable[Point]) -> list[Point]:
+        return [self.point(point) for point in polygon]

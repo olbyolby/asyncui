@@ -16,10 +16,12 @@ def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[
 
 
 class Box(Drawable):
-    def __init__(self, position: Inferable[Point], size: Size, color: Color):
+    filledBox: Final = -1
+    def __init__(self, position: Inferable[Point], size: Size, color: Color, thinkness: int = filledBox):
         self.position = position
         self.size = size
         self.color = color
+        self.thinkness = thinkness
     
     @cachedProperty
     def body(self) -> pygame.Rect:
@@ -27,10 +29,11 @@ class Box(Drawable):
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.rect(window, self.color, scale.rect(self.body))       
+        pygame.draw.rect(window, self.color, scale.rect(self.body), self.thinkness)       
 
     def reposition(self, position: Point) -> 'Box':
         return Box(position, self.size, self.color)
+        
 
 class Image(Drawable):
     def __init__(self, position: Inferable[Point], surface: pygame.Surface, size: Size | None = None) -> None:
@@ -61,7 +64,7 @@ class Text(Drawable):
     def __init__(self, position: Inferable[Point], font: Font, size: int, color: Color, text: Inferable[str]) -> None:
         self.position = position
         self.font = font
-        self.size = size
+        self.fontSize = size
         self.color = color
         self.text = text
 
@@ -71,16 +74,23 @@ class Text(Drawable):
         self._cachedScale = 1.
         self._cachedText: pygame.Surface | None = None
 
+    @cachedProperty
+    def size(self) -> Size:
+        return self.font[self.fontSize].size(self.text)
+    @cachedProperty
+    def body(self) -> pygame.Rect:
+        return pygame.Rect(*self.position, *self.size)
+
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
         #Check if the scale has changed, if yes, rerender the text
         if self._cachedText is None or self._cachedScale != scale.scaleFactor:
             self._cachedScale = scale.scaleFactor
-            self._cachedText = self.font[scale.fontSize(self.size)].render(self.text, True, self.color)
+            self._cachedText = self.font[scale.fontSize(self.fontSize)].render(self.text, True, self.color)
         
         window.blit(self._cachedText, scale.point(self.position))
 
     def reposition(self, position: Point) -> 'Text':
-        return Text(position, self.font, self.size, self.color, self.text)
+        return Text(position, self.font, self.fontSize, self.color, self.text)
     def changeText(self, text: str) -> 'Text':
-        return Text(self.position, self.font, self.size, self.color, text)
+        return Text(self.position, self.font, self.fontSize, self.color, text)
