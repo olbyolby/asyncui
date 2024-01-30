@@ -3,7 +3,7 @@ from types import EllipsisType
 import asyncio
 from abc import *
 from asyncUi.window import Window, EventHandler
-from asyncUi.graphics import Box, Text
+from asyncUi.graphics import Box, Text, Clickable
 from asyncUi.display import Color
 from asyncUi.resources import fonts
 from asyncUi import events
@@ -17,7 +17,8 @@ def exiter(event: events.Quit) -> Never:
     exit()
 exiter.register()
 
-box = Box((250-50, 125-50), (50, 50), Color(255, 0, 0))
+box = Box((250-50, 125-50), (50, 50), Color(255, 255, 0))
+clicker = Clickable(box.body, lambda e: print("You clicked it!")).__enter__()
 
 async def renderer() -> Never:
     while True:
@@ -32,4 +33,6 @@ asyncio.create_task(renderer())
 
 airal = fonts.fontManager.loadSystemFont('arial')
 text = Text((0,0), airal, 50, Color(255, 255, 255), "Hello")
+
+
 window.run()

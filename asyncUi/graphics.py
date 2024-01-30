@@ -1,9 +1,10 @@
 from asyncUi.display import Point
 from .util import Placeholder, Inferable
 from .display import Color, Size, Point, Drawable, Scale
-from typing import Final, Self, Callable, TypeVar, TypeVarTuple, Annotated
+from typing import Final, Self, Callable, TypeVar, TypeVarTuple, Annotated, Type
 from functools import cached_property as cachedProperty, wraps
 from .resources.fonts import Font
+from types import TracebackType
 import pygame
 
 
@@ -16,7 +17,7 @@ def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[
 
 
 class Box(Drawable):
-    filledBox: Final = -1
+    filledBox: Final = 0
     def __init__(self, position: Inferable[Point], size: Size, color: Color, thinkness: int = filledBox):
         self.position = position
         self.size = size
@@ -94,3 +95,53 @@ class Text(Drawable):
         return Text(position, self.font, self.fontSize, self.color, self.text)
     def changeText(self, text: str) -> 'Text':
         return Text(self.position, self.font, self.fontSize, self.color, text)
+
+
+from . import events
+from . window import eventHandlerMethod
+from contextlib import ExitStack
+from abc import abstractmethod
+
+class AutomaticStack:
+    _stack: ExitStack
+    
+    @abstractmethod
+    def enable(self) -> None:
+        ...
+
+    def disable(self) -> None:
+        self.__exit__(None, None, None)
+    
+    def __exit__(self, exceptionType: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
+        self._stack.__exit__(exceptionType, exception, traceback)
+    def __enter__(self) -> Self:
+        self.enable()
+        return self
+    
+
+class Clickable(AutomaticStack):
+    def __init__(self, area: pygame.rect.Rect, onClick: Callable[[events.MouseButtonUp], None]) -> None:
+        self.area = area
+        self.onClick = onClick
+    
+        self.debounce = False
+        self._stack = ExitStack()
+    @eventHandlerMethod
+    def _clickDownHandler(self, event: events.MouseButtonDown) -> None:
+        if self.debounce is False and self.area.collidepoint(event.pos):
+            self.debounce = True
+    @eventHandlerMethod
+    def _clickUpHandler(self, event: events.MouseButtonUp) -> None:
+        if self.debounce is True:
+            self.debounce = False
+            if self.area.collidepoint(event.pos):
+                self.onClick(event)
+
+    def enable(self) -> None:
+        with ExitStack() as stack:
+            stack.enter_context(self._clickDownHandler)
+            stack.enter_context(self._clickUpHandler)
+            self._stack = stack.pop_all()
+
+
+

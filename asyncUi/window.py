@@ -99,7 +99,7 @@ class MethodEventHandler(Generic[T, EventT]):
     def __init__(self, eventHandler: Callable[[T, EventT], None], eventType: Type[EventT]):
         self.eventType = eventType
         self.eventHandler = eventHandler
-    def __set_name__(self, name: str, onwer: Type[T2]) -> None:
+    def __set_name__(self, owner: Type[T2], name: str) -> None:
         self.name = name
     @overload
     def __get__(self, instance: None, owner: Type[T2]) -> Self: ...
@@ -329,10 +329,9 @@ class Window(asyncio.AbstractEventLoop):
         if event.type not in self.eventHandlers:
             return 
         for handler in frozenset(self.eventHandlers[event.type]):
-            try:
-                handler(event)
-            except Exception:
-                warnings.warn(RuntimeWarning(f"Exception inside event handler {handler} well handling {event}"))
+
+            handler(event)
+
     def _waitForEvent(self) -> events.Event:
         soonestEvent = self.timers.soonest()
         if soonestEvent == float('inf'):

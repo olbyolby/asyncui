@@ -40,7 +40,7 @@ class KeyUp(Event):
     mod: keyboard.ModifierKey
     unicode: str
     
-class MoudeButtonDown(Event):
+class MouseButtonDown(Event):
     type: int = pygame.MOUSEBUTTONDOWN
     pos: tuple[int, int]
     button: mouse.Button
