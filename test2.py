@@ -76,3 +76,15 @@ class AutomaticBases(Generic[*Ts]):
                     getattr(base, name)(*args)
         setattr(owner, name, wrapper)
 
+
+class Callback(Generic[*Ts]):
+    def __init__(self, callback: Callable[[*Ts], None | Awaitable[None]] | None) -> None:
+        self.callback = callback
+    def invoke(self, *args: *Ts) -> None:
+        if self.callback is None:
+            return
+        
+        result = self.callback(*args)
+        if isinstance(result, Awaitable):
+            asyncio.ensure_future(result)
+        

@@ -1,6 +1,9 @@
-from typing import Any, Type, Callable, Protocol, Literal
+from typing import Any, Type, Callable, Protocol, Literal, Generic, TypeVar, Annotated
 from . import keyboard, mouse
+from inspect import get_annotations as getAnnotations
+from dataclasses import dataclass
 import pygame
+
 
 class EventTypeMeta(type):
     type: int
@@ -17,6 +20,7 @@ class EventTypeMeta(type):
             return True
             
         return super().__instancecheck__(instance)
+
 
 
 

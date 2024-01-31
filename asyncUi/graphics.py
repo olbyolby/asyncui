@@ -1,10 +1,11 @@
+from __future__ import annotations
 from asyncUi.display import Point
 from .util import Placeholder, Inferable
-from .display import Color, Size, Point, Drawable, Scale
+from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler
 from typing import Final, Self, Callable, TypeVar, TypeVarTuple, Annotated, Type
 from functools import cached_property as cachedProperty, wraps
 from .resources.fonts import Font
-from types import TracebackType
+from contextlib import ExitStack
 import pygame
 
 
@@ -18,7 +19,10 @@ def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[
 
 class Box(Drawable):
     filledBox: Final = 0
-    def __init__(self, position: Inferable[Point], size: Size, color: Color, thinkness: int = filledBox):
+
+    size = Placeholder[Size]()
+    color = Placeholder[Color]()
+    def __init__(self, position: Inferable[Point], size: Inferable[Size], color: Inferable[Color], thinkness: int = filledBox):
         self.position = position
         self.size = size
         self.color = color
@@ -33,8 +37,7 @@ class Box(Drawable):
         pygame.draw.rect(window, self.color, scale.rect(self.body), self.thinkness)       
 
     def reposition(self, position: Point) -> 'Box':
-        return Box(position, self.size, self.color)
-        
+        return Box(position, self.size, self.color)     
 
 class Image(Drawable):
     def __init__(self, position: Inferable[Point], surface: pygame.Surface, size: Size | None = None) -> None:
@@ -97,27 +100,9 @@ class Text(Drawable):
         return Text(self.position, self.font, self.fontSize, self.color, text)
 
 
+
 from . import events
-from . window import eventHandlerMethod
-from contextlib import ExitStack
-from abc import abstractmethod
-
-class AutomaticStack:
-    _stack: ExitStack
-    
-    @abstractmethod
-    def enable(self) -> None:
-        ...
-
-    def disable(self) -> None:
-        self.__exit__(None, None, None)
-    
-    def __exit__(self, exceptionType: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
-        self._stack.__exit__(exceptionType, exception, traceback)
-    def __enter__(self) -> Self:
-        self.enable()
-        return self
-    
+from . window import eventHandlerMethod, Window
 
 class Clickable(AutomaticStack):
     def __init__(self, area: pygame.rect.Rect, onClick: Callable[[events.MouseButtonUp], None]) -> None:
@@ -128,13 +113,15 @@ class Clickable(AutomaticStack):
         self._stack = ExitStack()
     @eventHandlerMethod
     def _clickDownHandler(self, event: events.MouseButtonDown) -> None:
-        if self.debounce is False and self.area.collidepoint(event.pos):
+        scale = Scale(Window().scaleFactor)
+        if self.debounce is False and  scale.rect(self.area).collidepoint(event.pos):
             self.debounce = True
     @eventHandlerMethod
     def _clickUpHandler(self, event: events.MouseButtonUp) -> None:
+        scale = Scale(Window().scaleFactor)
         if self.debounce is True:
             self.debounce = False
-            if self.area.collidepoint(event.pos):
+            if scale.rect(self.area).collidepoint(event.pos):
                 self.onClick(event)
 
     def enable(self) -> None:
@@ -143,5 +130,48 @@ class Clickable(AutomaticStack):
             stack.enter_context(self._clickUpHandler)
             self._stack = stack.pop_all()
 
+class Hoverable(AutomaticStack): 
+    def __init__(self, area: pygame.rect.Rect, startHover: Callable[[events.MouseMove], None] | None, endHover: Callable[[events.MouseMove], None] | None) -> None:
+        self.area = area
+        self.startHover = startHover
+        self.endHover = endHover
 
+        self._hovered = False
+    @eventHandlerMethod
+    def _hoverHandler(self, event: events.MouseMove) -> None:
+        scale = Scale(Window().scaleFactor)
+        if self._hovered is False and scale.rect(self.area).collidepoint(event.pos):
+            self._hovered = True
+            if self.startHover is not None:
+                self.startHover(event)
+        elif self._hovered is True and not scale.rect(self.area).collidepoint(event.pos):
+            self._hovered = False
+            if self.endHover is not None:
+                self.endHover(event)
 
+    def enable(self) -> None:
+        with ExitStack() as stack:
+            stack.enter_context(self._hoverHandler)
+
+            self._stack = stack.pop_all()
+
+class Focusable(AutomaticStack):
+    def __init__(self, area: pygame.rect.Rect, onFocus: Callable[[], None], onUnfocus: Callable[[], None]) -> None:
+        self.area = area
+        self.onFocus = onFocus
+        self.onUnfocus = onUnfocus
+    
+        self._selected = False
+    @eventHandlerMethod
+    def _clickHandler(self, event: events.MouseButtonDown) -> None:
+        scale = Scale(Window().scaleFactor)
+        if self._selected is True and not scale.rect(self.area).collidepoint(event.pos):
+            self._selected = False
+            self.onUnfocus()
+        elif self._selected is False and scale.rect(self.area).collidepoint(event.pos):
+            self._selected = True
+            self.onFocus()
+
+    @stackEnabler
+    def enable(self, stack: ExitStack) -> None:
+        stack.enter_context(self._clickHandler)

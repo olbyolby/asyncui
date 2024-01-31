@@ -275,6 +275,10 @@ class Window(asyncio.AbstractEventLoop):
         newHeight = event.w * (self.orginalSize[1] / self.orginalSize[0])
         pygame.display.set_mode((event.w, newHeight), self.window.get_flags())
 
+    @property
+    def scaleFactor(self) -> float:
+        return self.window.get_size()[0]/self.orginalSize[0]
+
     # Scheduling callbacks for asyncio
     def callSoon(self, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.Handle:
         handle = asyncio.Handle(callback, args, self, context)
