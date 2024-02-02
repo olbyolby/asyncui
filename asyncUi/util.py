@@ -1,5 +1,6 @@
-from typing import Union, cast, Generic, TypeVar, TypeVar, overload, Type, Self
+from typing import Union, cast, Generic, TypeVar, TypeVar, overload, Type, Self, TypeVarTuple, Awaitable, Callable
 from types import EllipsisType
+import asyncio
 
 T = TypeVar('T')
 T2 = TypeVar('T2')
@@ -34,3 +35,92 @@ class Placeholder(Generic[T]):
         assert self.name is not None
         setattr(instance, self.name, value)
 Inferable = Union[T, EllipsisType]
+
+Ts = TypeVarTuple('Ts')
+class EventDispatcher(Generic[*Ts]):
+    """
+    Provides a "generalization" of callback functions, supporting both asynchronous and synchronous callbacks.
+    In addition, callbacks can take arguments for any associated data with the object.
+    This is useful for using callback functions in systems like UIs.
+
+    Example:
+        class Button:
+            def __init__(self) -> None:
+                self.onclick = EventDispatcher[ClickEvent]
+            def eventHandler(self, event: Event) -> None:
+                #Event handling code here
+                ...
+                self.onclick.notify(event)
+        
+        button = Button()
+
+        button.onclick.addListener(lambda e: print(f"You clicked {e.pos} from a synchronous callback"))
+        
+        async def main():
+            event = await button.onclick.listen()
+            print(f"You clicked {event.pos} but asynchronously!")
+
+        asyncio.run(main())
+    """
+    def __init__(self, defaultCallback: 'Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts] | None' = None) -> None:
+        """
+        Construct an `EventDispatcher`, takes an optional default callback
+
+        The default callback can be ether None, which will register no callbacks,
+        or a callable taking event data, which can be both synchronous or asynchronous,
+        or another EventDispatcher, which will copy it's event listeners.
+        """
+        if defaultCallback is None:
+            self.listeners = set[Callable[[*Ts], None | Awaitable[None]]]()
+        elif isinstance(defaultCallback, EventDispatcher):
+            defaultCallback = cast(EventDispatcher[*Ts], defaultCallback)
+            self.listeners = defaultCallback.listeners.copy()
+        else:
+            self.listeners = {defaultCallback}
+    def addListener(self, listener: Callable[[*Ts], None | Awaitable[None]]) -> Callable[[*Ts], None | Awaitable[None]]:
+        """
+        Add an event listener, will be called when the next event is received
+
+        The provided listener must be a callable taking the event's data.
+        Both Async and Synchronous functions are support
+        """
+        self.listeners.add(listener)
+        return listener
+    def removeListener(self, listener: Callable[[*Ts], None | Awaitable[None]]) -> None:
+        """
+        Remove an event listener
+
+        If the provided listener is not registered, it will throw an exception.
+        """
+        self.listeners.remove(listener)
+    def listen(self) -> Awaitable[tuple[*Ts]]:
+        """
+        Wait for the next event to be recived, returning that event's data.
+
+        Allows for asynchronously awaiting for the next event
+        """
+        future = asyncio.Future[tuple[*Ts]]()
+        @self.addListener
+        def resolver(*results: *Ts) -> None:
+            self.removeListener(resolver)
+            future.set_result(results)
+        return future
+    
+    async def notify(self, *data: *Ts) -> None:
+        """
+        Notify all awaiting coroutines and run all event listeners.
+        
+        All synchronous calllbacks are executed immediately and all asynchronous ones
+        are awaited via asyncio.gather
+        """
+        awaiting: list[Awaitable[None]] = []
+        for listener in frozenset(self.listeners):
+            result = listener(*data)
+            if isinstance(result, Awaitable):
+                awaiting.append(result)
+        
+        asyncio.gather(*awaiting)
+
+
+    def __contains__(self, handler: Callable[[*Ts], None | Awaitable[None]]) -> bool:
+        return handler in self.listeners

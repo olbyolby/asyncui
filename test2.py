@@ -1,4 +1,4 @@
-from typing import overload, TypeVar, Protocol, Generic, Type, cast, Self, TypeVarTuple, Callable, Never, Awaitable
+from typing import overload, TypeVar, Protocol, Generic, Type, cast, Self, TypeVarTuple, Callable, Never, Awaitable, Generator
 from types import TracebackType
 import asyncio
 
@@ -87,4 +87,180 @@ class Callback(Generic[*Ts]):
         result = self.callback(*args)
         if isinstance(result, Awaitable):
             asyncio.ensure_future(result)
+
+
+import inspect
+import ctypes
+from types import FrameType
+from typing import cast, TypeVar, Any, Iterable
+
+
+T2 = TypeVar('T2')
+def neverNone(var: T2 | None) -> T2:
+    if var is None:
+        raise ValueError("Unexpected None")
+    else:
+        return var
+
+class Locals:
+    def __init__(self, frame: FrameType | None = None) -> None:
+        if frame is None:
+            frame = neverNone(neverNone(inspect.currentframe()).f_back)
+        super().__setattr__('frame', frame)
+    def __getattribute__(self, name: str) -> Any:
+        frame = cast(FrameType,super().__getattribute__('frame'))
+        if name in frame.f_locals:
+            return frame.f_locals[name]
+        raise AttributeError(name = name, obj = self)
+    def __setattr__(self, name: str, value: Any) -> None:
+        frame = cast(FrameType,super().__getattribute__('frame'))
+        frame.f_locals[name] = value
+        ctypes.pythonapi.PyFrame_LocalsToFast(ctypes.py_object(frame), ctypes.c_int(0))
+    def __dir__(self) -> set[str]:
+        frame = cast(FrameType,super().__getattribute__('frame'))
+        return set(frame.f_locals.keys())
+
+def primesFn() -> Generator[int, None, None]:
+    primes: list[int] = []
+    yield 2  # Start with the first prime number
+
+    current_number = 3
+    while True:
+        is_prime = all(current_number % prime != 0 for prime in primes)
+        if is_prime:
+            primes.append(current_number)
+            yield current_number
+        current_number += 2  # Skip even numbers
+
+primes = primesFn()
+localsPrimes = Locals(primes.gi_frame)
+
+def take(it: Iterable[T2], max: int) -> Generator[T2, None, None]:
+    for i, value in enumerate(it):
+        yield value
+        if i == max:
+            return
+
+foundPrimes: list[int] = []
+for prime in take(primes,30):
+    #print(prime)
+    foundPrimes.append(prime)
+
+localsPrimes.primes = []
+for prime in take(primes, 30):
+    #print(prime)
+    foundPrimes.append(prime)
+
+print()
+print()
+print()
+realPrimes: list[int] = []
+for prime in take(primesFn(), 60):
+    print(prime)
+    realPrimes.append(prime)
+
+same = 0
+different = 0
+for found, real in zip(realPrimes, foundPrimes):
+    if found != real:
+        print(f"found {found}, epxected {real}")
+        different += 1
+    else:
+        same += 1
         
+print(f'{same} primes are correct, {different} are wrong')
+
+
+
+
+
+
+class EventDispatcher(Generic[*Ts]):
+    def __init__(self, defaultCallback: 'Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts] | None' = None) -> None:
+        if defaultCallback is None:
+            self.listeners = set[Callable[[*Ts], None | Awaitable[None]]]()
+        elif isinstance(defaultCallback, EventDispatcher):
+            defaultCallback = cast(EventDispatcher[*Ts], defaultCallback)
+            self.listeners = defaultCallback.listeners.copy()
+        else:
+            self.listeners = {defaultCallback}
+    def addListener(self, listener: Callable[[*Ts], None | Awaitable[None]]) -> None:
+        self.listeners.add(listener)
+    def removeListener(self, listener: Callable[[*Ts], None | Awaitable[None]]) -> None:
+        self.listeners.remove(listener)
+    def listen(self) -> Awaitable[tuple[*Ts]]:
+        future = asyncio.Future[tuple[*Ts]]()
+        @self.addListener
+        def resolver(*results: *Ts) -> None:
+            self.removeListener(resolver)
+            future.set_result(*results)
+        return future
+    
+    async def notify(self, *data: *Ts) -> None:
+        for listener in frozenset(self.listeners):
+            result = listener(*data)
+            if isinstance(result, Awaitable):
+                asyncio.ensure_future(result)
+CallbackArgument = Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts] | None
+
+
+import gc
+from typing import TypeVar, Type
+T2 = TypeVar('T2')
+def unperson(victim: object) -> None:
+    """
+    "Unperson" an object
+    
+    Delete every reference to an object, recursively delete any refers which can't be removed
+    This elimiates every reference to the object's existance
+    """
+    for ref in gc.get_referrers(victim):
+        for attr in dir(ref):
+            try:
+                if getattr(ref, attr) is victim:
+                    try:
+                        setattr(ref, attr, None)
+                    except:
+                        pass
+                    try:
+                        delattr(ref, attr)
+                    except:
+                        pass
+            except:
+                pass
+            try:
+                for key in ref.keys():
+                    if ref[key] is victim:
+                        del ref[key]
+            except:
+                pass
+            try: 
+                for i in range(0, len(ref)):
+                    if ref[i] is victim:
+                        del ref[i]
+            except:
+                pass
+    try: 
+        for ref in gc.get_referrers(victim):
+            unperson(ref)
+    except:
+        pass
+
+def genocide(victims: list[object]) -> None:
+    """
+    "Genocide" and object
+
+    Unperson's every object within a list of victims
+    """
+    for obj in victims:
+        print(obj, len(victims))
+        unperson(obj)
+        
+def createGhetto(group: Type[T2]) -> list[T2]:
+    """
+    Create's a "ghetto" of objects of a given type,
+    
+    grabs every object of a given type which exists in the inteperter,
+    grabs litterally ALL OF THEM, via gc.get_objects()
+    """
+    return [x for x in gc.get_objects() if isinstance(x, group)]
