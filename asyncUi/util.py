@@ -1,5 +1,6 @@
 from typing import Union, cast, Generic, TypeVar, TypeVar, overload, Type, Self, TypeVarTuple, Awaitable, Callable
 from types import EllipsisType
+from functools import wraps
 import asyncio
 
 T = TypeVar('T')
@@ -8,8 +9,9 @@ T2 = TypeVar('T2')
 __all__ = ('Placeholder')
 
 class Placeholder(Generic[T]):
-    def __init__(self, name: str | None = None):
+    def __init__(self, default: T | None = None, name: str | None = None):
         self.name: str | None = name
+        self.default = default
     def __set_name__(self, owner: Type[T2], name: str) -> None:
         self.name = "_" + name
         self.attrName = name
@@ -26,14 +28,12 @@ class Placeholder(Generic[T]):
             assert self.name is not None, "descriptor's name must be set"
             if not hasattr(instance, self.name):
                 raise ValueError(f'attribute {self.attrName} of {instance!r} is not initialized')
-            value = cast(EllipsisType | T, getattr(instance, self.name))
-            if value is ...:
-                raise ValueError(f'attribute {self.attrName} of {instance!r} is not valid(it is a placeholder)')
+            value = cast(T, getattr(instance, self.name))
             return value
     
     def __set__(self, instance: T2, value: T | EllipsisType) -> None:
         assert self.name is not None
-        setattr(instance, self.name, value)
+        setattr(instance, self.name, value if value is not ... else self.default)
 Inferable = Union[T, EllipsisType]
 
 Ts = TypeVarTuple('Ts')
@@ -124,3 +124,14 @@ class EventDispatcher(Generic[*Ts]):
 
     def __contains__(self, handler: Callable[[*Ts], None | Awaitable[None]]) -> bool:
         return handler in self.listeners
+
+class Flag:
+    def __init__(self) -> None:
+        self._state = False
+    def __bool__(self) -> bool:
+        return self._state
+    def set(self, state: bool = True) -> None:
+        self._state = state
+    def unset(self) -> None:
+        self._state = False
+

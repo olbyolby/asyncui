@@ -3,10 +3,22 @@ from abc import ABC, abstractmethod
 from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar
 from .util import Placeholder
 from .resources import fonts
+from .window import Window
 from contextlib import ExitStack
 from abc import abstractmethod
-from types import TracebackType
+from types import TracebackType, EllipsisType
+from functools import wraps
 
+__all__ = [
+    'Color',
+    'Point',
+    'Size',
+    'Drawable',
+    'Scale',
+    'AutomaticStack',
+    'stackEnabler',
+    'renderer'
+]
 
 class Color(NamedTuple):
     red: int
@@ -23,9 +35,9 @@ class Drawable(ABC):
         ...
 
     @abstractmethod
-    def reposition(self, position: Point, /) -> Self:
+    def reposition(self, position: Point | EllipsisType, /) -> Self:
         ...
-    position = Placeholder[Point]()
+    position = Placeholder[Point]((0, 0))
     
 class Scale:
     def __init__(self, scale: float) -> None:
@@ -87,3 +99,21 @@ def stackEnabler(function: Callable[[_AutoStackT, ExitStack], None]) -> Callable
             function(self, stack)
             self._stack = stack.pop_all()
     return wrapper
+
+T = TypeVar('T')
+def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[T, pygame.Surface, float], None]:
+    @wraps(function)
+    def wrapper(self: T, window: pygame.Surface, scale: float) -> None:
+        return function(self, window, Scale(scale))
+    return wrapper
+
+class Clip:
+    def __init__(self, target: pygame.Surface, area: pygame.Rect) -> None:
+        self.target = target
+        self.area = area
+    def __enter__(self) -> Self:
+        self.oldClip = self.target.get_clip()
+        self.target.set_clip(self.area)
+        return self
+    def __exit__(self, exceptionType: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
+        self.target.set_clip(self.oldClip)

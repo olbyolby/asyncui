@@ -225,10 +225,11 @@ class Window(asyncio.AbstractEventLoop):
     
 
 
-    def __init__(self, window: pygame.Surface | EllipsisType = ...) -> None:
+    def __init__(self, window: pygame.Surface | EllipsisType = ..., title: str | EllipsisType = ...) -> None:
         if window is ...: return
+        if title is ...: return
 
-  
+        pygame.display.set_caption(title)
         self.size = window.get_size()
         self.window = window
         self.eventHandlers: dict[int, set[Callable[[Any], None]]] = {}
@@ -333,8 +334,8 @@ class Window(asyncio.AbstractEventLoop):
         if event.type not in self.eventHandlers:
             return 
         for handler in frozenset(self.eventHandlers[event.type]):
-
             handler(event)
+            #self.callSoon(handler, event)
 
     def _waitForEvent(self) -> events.Event:
         soonestEvent = self.timers.soonest()
@@ -378,18 +379,18 @@ class Window(asyncio.AbstractEventLoop):
     # Init via `Window(windowSurface)`, 
     # Get the current window via `Window()`
     __instance: Self | None = None
-    def __new__(cls, window: pygame.Surface | EllipsisType = ...) -> 'Window':
+    def __new__(cls, window: pygame.Surface | EllipsisType = ..., title: str | EllipsisType = ...) -> 'Window':
         #Check if no instance is set
         if cls.__instance is None:
             #if no instance is set, then initiazliation must be happening
-            if window is ...:
+            if window is ... or title is ...:
                 raise RuntimeError(f"{__name__} is not initialized")
             self = super().__new__(cls)
             cls.__instance = self
             return self
         else:
             #if an instance is set, you can't provide init data.
-            if window is not ...:
+            if window is not ... or title is not ...:
                 raise RuntimeError(f"{__name__} is already initialized")
             
             return cls.__instance

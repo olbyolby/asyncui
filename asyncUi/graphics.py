@@ -1,21 +1,19 @@
 from __future__ import annotations
+from types import EllipsisType
 from asyncUi.display import Point
-from .util import Placeholder, Inferable
-from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler
-from typing import Final, Self, Callable, TypeVar, TypeVarTuple, Annotated, Type
+from .util import Placeholder, Inferable, Flag
+from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip
+from typing import Final, Self, Callable
 from functools import cached_property as cachedProperty, wraps
 from .resources.fonts import Font
 from contextlib import ExitStack
 import pygame
 
 
-T = TypeVar('T')
-def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[T, pygame.Surface, float], None]:
-    @wraps(function)
-    def wrapper(self: T, window: pygame.Surface, scale: float) -> None:
-        return function(self, window, Scale(scale))
-    return wrapper
 
+def renderAll(window: pygame.Surface, scale: float, *targets: Drawable) -> None:
+    for target in targets:
+        target.draw(window, scale)
 
 class Box(Drawable):
     filledBox: Final = 0
@@ -36,7 +34,7 @@ class Box(Drawable):
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
         pygame.draw.rect(window, self.color, scale.rect(self.body), self.thinkness)       
 
-    def reposition(self, position: Point) -> 'Box':
+    def reposition(self, position: Inferable[Point]) -> 'Box':
         return Box(position, self.size, self.color)     
 
 class Image(Drawable):
@@ -58,13 +56,13 @@ class Image(Drawable):
         
         window.blit(self._cachedSurface, scale.point(self.position))
 
-    def reposition(self, position: Point) -> 'Image':
+    def reposition(self, position: Inferable[Point]) -> 'Image':
         return Image(position, self.surface, self.size)
     def resize(self, size: Size) -> 'Image':
         return Image(self.position, self.surface, size)
 
 class Text(Drawable):
-    text = Placeholder[str]()
+    text = Placeholder[str]('')
     def __init__(self, position: Inferable[Point], font: Font, size: int, color: Color, text: Inferable[str]) -> None:
         self.position = position
         self.font = font
@@ -84,6 +82,13 @@ class Text(Drawable):
     @cachedProperty
     def body(self) -> pygame.Rect:
         return pygame.Rect(*self.position, *self.size)
+    
+    def characterPosition(self, index: int) -> Point:
+        return self.font[self.fontSize].size(self.text[:index])[0] + self.position[0], self.position[1]
+
+    @cachedProperty
+    def height(self) -> int:
+        return self.font[self.fontSize].get_linesize()
 
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
@@ -94,10 +99,11 @@ class Text(Drawable):
         
         window.blit(self._cachedText, scale.point(self.position))
 
-    def reposition(self, position: Point) -> 'Text':
+    def reposition(self, position: Inferable[Point]) -> 'Text':
         return Text(position, self.font, self.fontSize, self.color, self.text)
     def changeText(self, text: str) -> 'Text':
         return Text(self.position, self.font, self.fontSize, self.color, text)
+    
 
 
 
@@ -105,12 +111,19 @@ from . import events
 from . window import eventHandlerMethod, Window
 
 class Clickable(AutomaticStack):
-    def __init__(self, area: pygame.rect.Rect, onClick: Callable[[events.MouseButtonUp], None]) -> None:
-        self.area = area
+    position = Placeholder[Point]()
+    def __init__(self, position: Inferable[Point], size: Size, onClick: Callable[[events.MouseButtonUp], None]) -> None:
+        self.position = position
+        self.size = size
         self.onClick = onClick
     
         self.debounce = False
         self._stack = ExitStack()
+
+    @cachedProperty
+    def area(self) -> pygame.rect.Rect:
+        return pygame.Rect(*self.position, *self.size) 
+    
     @eventHandlerMethod
     def _clickDownHandler(self, event: events.MouseButtonDown) -> None:
         scale = Scale(Window().scaleFactor)
@@ -131,12 +144,18 @@ class Clickable(AutomaticStack):
             self._stack = stack.pop_all()
 
 class Hoverable(AutomaticStack): 
-    def __init__(self, area: pygame.rect.Rect, startHover: Callable[[events.MouseMove], None] | None, endHover: Callable[[events.MouseMove], None] | None) -> None:
-        self.area = area
+    position = Placeholder[Point]()
+    def __init__(self, position: Inferable[Point], size: Size, startHover: Callable[[events.MouseMove], None] | None, endHover: Callable[[events.MouseMove], None] | None) -> None:
+        self.position = position
+        self.size = size
         self.startHover = startHover
         self.endHover = endHover
 
         self._hovered = False
+    @cachedProperty
+    def area(self) -> pygame.rect.Rect:
+        return pygame.Rect(*self.position, *self.size) 
+    
     @eventHandlerMethod
     def _hoverHandler(self, event: events.MouseMove) -> None:
         scale = Scale(Window().scaleFactor)
@@ -156,12 +175,18 @@ class Hoverable(AutomaticStack):
             self._stack = stack.pop_all()
 
 class Focusable(AutomaticStack):
-    def __init__(self, area: pygame.rect.Rect, onFocus: Callable[[], None], onUnfocus: Callable[[], None]) -> None:
-        self.area = area
+    position = Placeholder[Point]()
+    def __init__(self, position: Inferable[Point], size: Size, onFocus: Callable[[], None], onUnfocus: Callable[[], None]) -> None:
+        self.position = position
+        self.size = size
         self.onFocus = onFocus
         self.onUnfocus = onUnfocus
     
         self._selected = False
+
+    @cachedProperty
+    def area(self) -> pygame.rect.Rect:
+        return pygame.Rect(*self.position, *self.size) 
     @eventHandlerMethod
     def _clickHandler(self, event: events.MouseButtonDown) -> None:
         scale = Scale(Window().scaleFactor)
@@ -176,6 +201,125 @@ class Focusable(AutomaticStack):
     def enable(self, stack: ExitStack) -> None:
         stack.enter_context(self._clickHandler)
 
+class InputBoxDisplay(Drawable):
+    """
+    A box containing text and a cursor.
+
+    everything you need to render a basic text input box, 
+    and to make changes to cursor position or text conent(Inserting text, backspace, left/right arrow, etc).
+
+    Does not do any event handling, either implement that yourself
+    or use `InputBox`.
+    """
+    def __init__(self, position: Inferable[Point], text: Text, background: Box, cursorPosition: int, showCursor: bool = True) -> None:
+        self.position = position
+        self.background = background.reposition(position)
+
+        if position is not ...:
+            height = (background.size[1] - text.height) // 2
+            self.text = text.reposition((position[0], position[1] + height))
+        else:
+            self.text = text
+
+        self.showCursor = showCursor
+        self.cursorBox = Box(self.text.characterPosition(cursorPosition), (2, self.text.height), self.text.color)
+        self.cursorPosition  = cursorPosition
+
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        with Clip(window, self.background.body):
+            self.background.draw(window, scale)
+            self.text.draw(window, scale)
+            if self.showCursor:
+                self.cursorBox.draw(window, scale)
+    
+    def reposition(self, position: Point | EllipsisType) -> 'InputBoxDisplay':
+        return InputBoxDisplay(position, self.text, self.background, self.cursorPosition, self.showCursor)
+
+    def appendText(self, text: str) -> 'InputBoxDisplay':
+        return InputBoxDisplay(self.position, self.text.changeText(self.text.text+text), self.background, self.cursorPosition, self.showCursor)
+    def changeText(self, text: str) -> 'InputBoxDisplay':
+        return InputBoxDisplay(self.position, self.text.changeText(text), self.background, self.cursorPosition, self.showCursor)
+    def changeCursorPosition(self, position: int) -> 'InputBoxDisplay':
+        position = max(min(position, len(self.text.text)), 0)
+        return InputBoxDisplay(self.position, self.text, self.background, position, self.showCursor)
+    def insertText(self, text: str) -> 'InputBoxDisplay':
+        return self.changeText(self.text.text[:self.cursorPosition] + text + self.text.text[self.cursorPosition:]).changeCursorPosition(self.cursorPosition+len(text))
+    def backspace(self) -> 'InputBoxDisplay':
+        if self.cursorPosition == 0:
+            return self
+        return self.changeText(self.text.text[:self.cursorPosition-1] + self.text.text[self.cursorPosition:]).changeCursorPosition(self.cursorPosition-1)
+    def delete(self) -> 'InputBoxDisplay':
+        if self.cursorPosition == len(self.text.text):
+            return self
+        return self.changeText(self.text.text[:self.cursorPosition] + self.text.text[self.cursorPosition+1:])
+    def changeCursorShown(self, state: bool) -> 'InputBoxDisplay':
+        return InputBoxDisplay(self.position, self.text, self.background, self.cursorPosition, state)
+    
+    @cachedProperty
+    def body(self) -> pygame.Rect:
+        return self.background.body
+    @cachedProperty
+    def size(self) -> Size:
+        return self.background.size
+    
+class InputBox(Drawable, AutomaticStack):
+    """
+    Basic text input box, wraps `InputBoxDisplay` to allow reacting to user input
+
+    'hydrates' the InputBoxDisplay, allowing input via the keyboard and detecting when enter is pressed.
+    Supported input:
+        - Arrow keys for moving around in the text
+        - Enter for submitting the text
+        - Keyboard input(including modifier keys)
+        - Focusing with the mouse(unfouced by default)
+        - `onEnter` callback function
+    Planned:
+        - Copy & paste
+        - Scrolling when text is too long
+    
+    """
+    def __init__(self, textBox: InputBoxDisplay, onEnter: Callable[[str], None] | None) -> None:
+        self.textBox = textBox.changeCursorShown(False)
+        self.onEnter = onEnter
 
 
+        self._focused = False
+        self._focuser = Focusable(textBox.position, textBox.size, self._onFocus, self._onUnfocus)
+    
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.textBox.draw(window, scale)
+    def reposition(self, position: Point | EllipsisType) -> 'InputBox':
+        return InputBox(self.textBox.reposition(position), self.onEnter)
 
+    def _onFocus(self) -> None:
+        self.textBox = self.textBox.changeCursorShown(True)
+        self._focused = True
+    def _onUnfocus(self) -> None:
+        self.textBox = self.textBox.changeCursorShown(False)
+        self._focused = False
+    @eventHandlerMethod
+    def _textInput(self, event: events.TextInput) -> None:
+        if self._focused:
+            self.textBox = self.textBox.insertText(event.text)
+    @eventHandlerMethod
+    def _keyDown(self, event: events.KeyDown) -> None:
+        if self._focused:
+            match event.key:
+                case events.keyboard.Keys.Backspace:
+                    self.textBox = self.textBox.backspace()
+                case events.keyboard.Keys.Delete:
+                    self.textBox = self.textBox.delete()
+                case events.keyboard.Keys.Left:
+                    self.textBox = self.textBox.changeCursorPosition(self.textBox.cursorPosition-1)
+                case events.keyboard.Keys.Right:
+                    self.textBox = self.textBox.changeCursorPosition(self.textBox.cursorPosition+1)
+                case events.keyboard.Keys.Return:
+                    if self.onEnter is not None:
+                        self.onEnter(self.textBox.text.text)
+    
+    @stackEnabler
+    def enable(self, stack: ExitStack) -> None:
+        """Enable the handling of events(Should be done from context manager)"""
+        stack.enter_context(self._textInput)
+        stack.enter_context(self._keyDown)
+        stack.enter_context(self._focuser)
