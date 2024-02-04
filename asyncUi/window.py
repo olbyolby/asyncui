@@ -1,10 +1,27 @@
+"""
+This module adds support for Asyncio-pygame integration,
+it is the bases of basiclly this whole package.
+Contains classes for event handlers and creating a Window/event loop.
+
+Classes:
+
+    Window - The core of any asyncUi program, manages the event loop and rendering. Also a Singleton
+    EventHandler - An event handler for pygame events, avaliable as a decorator via `eventHandler`
+    MethodEventHandler - Similar to `EventHandler`, but for class/unbound functions, constructed via `eventHandlerMethod 
+    Renderer - A running renderer, renders to the screen asynchronously and maintains FPS
+
+Functions:
+
+    eventHandler - decorator, creates an `EventHandler` from a function. Supports infering event type form type hints.
+    eventHandlerMethod - creates a `MethodEventHandler`, also supports infering the event type.
+
+"""
 import pygame
 import asyncio
 import time
 import warnings
 import inspect
 import functools
-import traceback
 from typing import Awaitable, Generic, Callable, TypeVar, cast, Type, Any, TypeVarTuple, Self, overload, Coroutine, Generator, Never, get_type_hints as getTypeHints
 from . import events
 from contextvars import Context
@@ -25,6 +42,18 @@ EventT = TypeVar("EventT", bound=events.Event)
 
 
 class EventHandler(Generic[EventT]):
+    """
+    Manages registrating and unregistrating of event handlers for the current window
+
+    It can also be used as a context manager to safely register and unregister event handlers.
+    It is recommended to use the `eventHandler` decorator to create an event handler
+
+    Methods:
+        register - registers the event handler, has no effect if already registered
+        unregister - unregisters the event handler, has no effect if already unregistered
+        registered - checks if the event handler is currently registered
+
+    """
     def __init__(self, function: Callable[[EventT], None], eventType: Type[EventT] | None = None):
         self.function = function
         if eventType is not None:
@@ -96,6 +125,12 @@ def eventHandler(eventType: Type[EventT] | Callable[[EventT], None]) -> Callable
         return EventHandler(eventType)
 
 class MethodEventHandler(Generic[T, EventT]):
+    """
+    A descriptor for managing class/unbound event handlers.
+
+    When used on a class, automatically binds `self` and allows class functions to be used as event handlers.
+    It's recommened to use `eventHanlderMethod` to create MethodEventHandler instances
+    """
     def __init__(self, eventHandler: Callable[[T, EventT], None], eventType: Type[EventT]):
         self.eventType = eventType
         self.eventHandler = eventHandler
@@ -113,6 +148,9 @@ class MethodEventHandler(Generic[T, EventT]):
 
         boundHandler: Callable[[EventT], None] = functools.partial(self.eventHandler, instance)
         handler = EventHandler(boundHandler, self.eventType)
+        
+        #replace the attribute with the new event handler, bypassing this for feature accesses, so
+        #cls.handler is cls.handler == True
         setattr(instance, self.name, handler)
         return handler  
     
@@ -123,12 +161,47 @@ def eventHandlerMethod(eventType: Type[EventT], /) -> Callable[[Callable[[T, Eve
 def eventHandlerMethod(handler: Callable[[T, EventT], None], /) -> MethodEventHandler[T, EventT]: ...
 
 def eventHandlerMethod(handlerOrType: Type[EventT] | Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT] | Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:
+    """
+    Create an event handler from a class method
+
+    The event type can be provided explicitly by passing it as an argument to the decorator,
+    or it can be inffered based on the function's type hint.
+
+    Returns an instance of `MethodEventHandler`
+
+    Examples:
+        class Example:
+            def __init__(self, value: int) -> None:
+                self.value = value
+            #explicitly provide the event type
+            @eventHandlerMethod(events.KeyDown)
+            def keyDownHandler(self, event: events.KeyDown) -> None:
+                print("value is: ", self.value, ", key down is: ", event.unicode)
+            
+            #implicitly infer the event type
+            @eventHandlerMethod
+            def keyUpHandler(self, event: events.KeyUp) -> None:
+                print("value is: ", self.value, ", key up is: ", event.unicode)
+        
+        #create an Example and register it's handlers
+        example = Example(5)
+        example.keyDownHandler.register()
+        example.keyUpHandler.register()
+
+        window.run()
+        # Now, when ever you press a key, it will print 'value is: 5, key down is: {the key}',
+        # and when you relase the key it'll print 'value is: 5, key up is: {the key}'
+        # Notice how `self` is also passed as an argument
+    """
+    
     if isinstance(handlerOrType, type):
+        #if an event type is given explicitly, return a new decorator to create the method handler
         eventType = handlerOrType
         def _inner(handler:Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT]:
             return MethodEventHandler(handler, eventType)
         return _inner
     else:
+        #if no event type is speificed, infer it from the function's type hint
         handler = handlerOrType
 
         if not inspect.isfunction(handler):
@@ -195,14 +268,14 @@ class TimerList:
         for timer in self.timers:
             if timer.when() - Window().time() <= 0:
                 deadTimers.append(timer)
-                Window().postEvent(ExacuteCallbackEvent(timer))
+                Window().postEvent(ExecuteCallbackEvent(timer))
         for timer in deadTimers:
             self.timers.remove(timer)
     def cancel(self, timer: asyncio.TimerHandle) -> None:
         if timer in self.timers:
             self.timers.remove(timer)
 @dataclass
-class ExacuteCallbackEvent(events.Event):
+class ExecuteCallbackEvent(events.Event):
     """
     This is the event triggered when a callback is scheduled to run,
     should not be used by user code
@@ -221,6 +294,13 @@ def _isEventLoopRunning() -> bool:
         return True
 
 class Renderer:
+    """
+    Calls a renderering function at a given FPS, accounting for the time to render
+    
+    Methods:
+        stop - stops rendering after the current frame finishes
+        running - returns wether or not the renderer is currently running
+    """
     def __init__(self, fps: int, renderer: Callable[['Window'], None]) -> None:
         self._running = False
         self.renderer = renderer
@@ -231,6 +311,7 @@ class Renderer:
         return self._running
 
     async def _runner(self) -> None:
+        # The loop that does rendering
         while self._running:
             start = Window().time()
             self.renderer(Window())
@@ -238,11 +319,40 @@ class Renderer:
             end = Window().time()
             await asyncio.sleep(1/self.fps - (end - start))
     def _run(self) -> None:
+        # Schedule the rendering loop
         self._running = True
         asyncio.ensure_future(self._runner())
 
 class Window(asyncio.AbstractEventLoop): 
+    """
+    The currently running window. Manages asyncio events, pygame event handlers, and rendering.
+    Is a singleton, accessible by calling Window() with no arguments
+
+    This is the core class of any asyncUi program, it manages the event loop and calls registered evnet handlers.
+    It allows for async-await to be used with pygame, allowing asynchronous programming to be used.
+
+    Initalization:
+        Window is a singleton, but it must first be initialized, via Window(pygame.Surface, title),
+        the surface should be the pygame window, and the title is well, the title.
+
+        After that, the current window can be accessed via Window(), which will return the window instance.
     
+    Methods:
+
+        registerEventHandler - register an event handler for the given event type
+        unregisterEventHandler - unregister an event handler for the given event type, throws if that handler is not registered
+        isEventHandlerRegistered - returns wether or not the given event handler is registered for the given event type
+        postEvent - post a pygame or asyncui event to the pygame event queue
+        getEvent - asyncshrnously await for the next event of given type
+
+        scaleFactor - Returns the scale factor between the current window size and it's initial size
+        startRenderer - Takes a render function an FPS and returns a `Renderer` instance, raises if a renderer is already running
+
+        run - run the event loop forever
+
+        refer to asyncio's event loop documentation for other all methods. 
+        https://docs.python.org/3/library/asyncio-eventloop.html
+    """
 
 
     def __init__(self, window: pygame.Surface | EllipsisType = ..., title: str | EllipsisType = ...) -> None:
@@ -257,7 +367,7 @@ class Window(asyncio.AbstractEventLoop):
         self.orginalSize = window.get_size()
         self.renderer: Renderer | None = None
 
-        self.registerEventHandler(ExacuteCallbackEvent, self._run_exacute_callback)
+        self.registerEventHandler(ExecuteCallbackEvent, self._run_exacute_callback)
         self.registerEventHandler(events.VideoResize, self._resizeHandler)
 
         self.errorHandler: Callable[['Window', dict[Any, Any]], None] | None = None
@@ -265,11 +375,20 @@ class Window(asyncio.AbstractEventLoop):
     
     #Event handler processing
     def registerEventHandler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
+        """
+        Register an event handler for a given event type
+        
+        The event handler will be executed next time the given event is received
+        """
         if eventType.type not in self.eventHandlers:
             self.eventHandlers[eventType.type] = set()
 
         self.eventHandlers[eventType.type].add(handler)
     def unregisterEventHandler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
+        """
+        unregister an event handler for a given event type,
+        raises a ValueError if the event handler is not registered
+        """
         if eventType.type not in self.eventHandlers:
             raise ValueError("No event handlers of {evnetType!r} are registered") 
         if handler not in self.eventHandlers[eventType.type]:
@@ -277,14 +396,23 @@ class Window(asyncio.AbstractEventLoop):
         
         self.eventHandlers[eventType.type].remove(handler)
     def isEventHandlerRegistered(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> bool:
+        """
+        Return whether or not an event handler is registered
+        """
         return eventType.type in self.eventHandlers and handler in self.eventHandlers[eventType.type]
-
-    def postEvent(self, eventType: EventT) -> None:
-        pygame.event.post(events.toPygameEvent(eventType))
+    def postEvent(self, event: EventT | pygame.event.Event) -> None:
+        """
+        Post ether an asyncUi event or an pygame event to the event queue
+        """
+        if isinstance(event, pygame.event.Event):
+            pygame.event.post(event)
+        else:
+            pygame.event.post(events.toPygameEvent(event))
     
 
     #aync event handling
     def getEvent(self, eventType: Type[EventT]) -> Awaitable[EventT]:
+        """Asynchronously await for the next event of given type"""
         eventFuture = asyncio.Future[EventT]()
         def eventHook(event: EventT) -> None:
             eventFuture.set_result(event)
@@ -299,18 +427,26 @@ class Window(asyncio.AbstractEventLoop):
 
     @property
     def scaleFactor(self) -> float:
+        """
+        Returns the scale factor between the inital window size and it's current size
+        """
         return self.window.get_size()[0]/self.orginalSize[0]
 
     def startRenderer(self, fps: int, renderer: Callable[['Window'], None]) -> Renderer:
+        """
+        Starts rendering via the renderer function at the given FPS,
+        returning a Rederer instance.
+        """
         if self.renderer is not None and self.renderer.running():
             raise RuntimeError("Renderer already running")
         self.renderer = Renderer(fps, renderer)
         self.renderer._run()
         return self.renderer
+    
     # Scheduling callbacks for asyncio
     def callSoon(self, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.Handle:
         handle = asyncio.Handle(callback, args, self, context)
-        self.postEvent(ExacuteCallbackEvent(handle))
+        self.postEvent(ExecuteCallbackEvent(handle))
         return handle
     call_soon = callSoon #type: ignore #Type shed's arguments arne't correct, *args should be a TypeVarTuple, not Any
     def callSoonThreadsafe(self, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.Handle:
@@ -349,7 +485,7 @@ class Window(asyncio.AbstractEventLoop):
 
     #Running events
 
-    def _run_exacute_callback(self, event: ExacuteCallbackEvent) -> None:
+    def _run_exacute_callback(self, event: ExecuteCallbackEvent) -> None:
         """
         This is the event handler that is used to exacute Handles
         """
