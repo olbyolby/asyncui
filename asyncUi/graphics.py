@@ -1,7 +1,7 @@
 from __future__ import annotations
 from types import EllipsisType
 from asyncUi.display import Point
-from .util import Placeholder, Inferable, Flag
+from .util import Placeholder, Inferable, Flag, EventDispatcher
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler
 from typing import Final, Self, Callable, Protocol, Sequence
 from functools import cached_property as cachedProperty, wraps

@@ -37,6 +37,7 @@ class Placeholder(Generic[T]):
 Inferable = Union[T, EllipsisType]
 
 Ts = TypeVarTuple('Ts')
+Callback = 'Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts | None]'
 class EventDispatcher(Generic[*Ts]):
     """
     Provides a "generalization" of callback functions, supporting both asynchronous and synchronous callbacks.
@@ -106,20 +107,18 @@ class EventDispatcher(Generic[*Ts]):
             future.set_result(results)
         return future
     
-    async def notify(self, *data: *Ts) -> None:
+    def notify(self, *data: *Ts) -> None:
         """
         Notify all awaiting coroutines and run all event listeners.
         
         All synchronous calllbacks are executed immediately and all asynchronous ones
         are awaited via asyncio.gather
         """
-        awaiting: list[Awaitable[None]] = []
+
         for listener in frozenset(self.listeners):
             result = listener(*data)
             if isinstance(result, Awaitable):
-                awaiting.append(result)
-        
-        asyncio.gather(*awaiting)
+                asyncio.ensure_future(result)
 
 
     def __contains__(self, handler: Callable[[*Ts], None | Awaitable[None]]) -> bool:
