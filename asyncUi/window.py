@@ -22,7 +22,7 @@ import time
 import warnings
 import inspect
 import functools
-from typing import Awaitable, Generic, Callable, TypeVar, cast, Type, Any, TypeVarTuple, Self, overload, Coroutine, Generator, Never, get_type_hints as getTypeHints
+from typing import Protocol, Awaitable, Generic, Callable, TypeVar, cast, Type, Any, TypeVarTuple, Self, overload, Coroutine, Generator, Never, get_type_hints as getTypeHints
 from . import events
 from contextvars import Context
 from dataclasses import dataclass
@@ -293,6 +293,13 @@ def _isEventLoopRunning() -> bool:
     else:
         return True
 
+
+class _HasFileNumber(Protocol):
+    def fileno(self) -> int: ...
+FileDescriptorLike = int | _HasFileNumber
+from socket import socket
+
+
 class Renderer:
     """
     Calls a renderering function at a given FPS, accounting for the time to render
@@ -369,6 +376,9 @@ class Window(asyncio.AbstractEventLoop):
 
         self.registerEventHandler(ExecuteCallbackEvent, self._run_exacute_callback)
         self.registerEventHandler(events.VideoResize, self._resizeHandler)
+
+        self.closed= False
+        self.running = False
 
         self.errorHandler: Callable[['Window', dict[Any, Any]], None] | None = None
         asyncio._set_running_loop(self)
@@ -506,9 +516,17 @@ class Window(asyncio.AbstractEventLoop):
             return cast(events.Event, pygame.event.wait())
         else:
             return cast(events.Event, pygame.event.wait(int(soonestEvent*1000)))
-    def run(self) -> Never:
-        while True:
+    def run(self) -> None:
+        self.running = True
+        while self.running:
             self._handleEvent(self._waitForEvent())
+
+    def stop(self) -> None:
+        self.running = False
+    def isRunning(self) -> bool:
+        return self.running
+    is_running = isRunning
+
 
 
     # Exception handling
@@ -537,6 +555,7 @@ class Window(asyncio.AbstractEventLoop):
             self.default_exception_handler(context)
         else:
             self.errorHandler(self, context)
+    
 
     # Supporting stuff for singletons
     # Init via `Window(windowSurface)`, 
@@ -559,3 +578,66 @@ class Window(asyncio.AbstractEventLoop):
             return cls.__instance
 
 
+
+
+    # A pile of bullshit I don't know how to implement in pygame
+    def add_reader(self, fileno: FileDescriptorLike, callback: Callable[[*Ts], T], *args: *Ts) -> None:
+        raise NotImplementedError("pygame event loop does not support readers")
+    def remove_reader(self, fileno: FileDescriptorLike) -> bool:
+        raise NotImplementedError("pygame event loop does not support readers")
+    def add_writer(self, fileno: FileDescriptorLike, callback: Callable[[*Ts], T], *args: *Ts) -> None:
+        raise NotImplementedError("pygame event loop does not support writers")
+    def remove_writer(self, fileno: FileDescriptorLike) -> bool:
+        raise NotImplementedError("pygame event loop does not support writers")
+    
+    async def sock_recv(self, sock: socket, nbytes: int) -> bytes:
+        raise NotImplementedError("pygame event loop does not support sockets")
+    async def sock_recv_into(self, sock: socket, buffer: object) -> int:
+        raise NotImplementedError("pygame event loop does not support sockets")
+    async def sock_recvfrom(self, stock: socket, bufferSize: int) -> tuple[bytes, Any]:
+        raise NotImplementedError("pygame event loop does not support sockets")
+    async def sock_recvfrom_into(self, stock: socket, buffer: object, nbytes: int = 0) -> tuple[int, Any]:
+        raise NotImplementedError("pygame event loop does not support sockets")
+    async def sock_sendall(self, stock: socket, data: object) -> None:
+        raise NotImplementedError("pygame event loop does not support sockets")
+    async def sock_sendto(self, sock: socket, data: object, address: Any) -> int:
+            raise NotImplementedError("pygame event loop does not support sockets")
+    async def sock_connect(self, sock: socket, address: Any) -> None:
+        raise NotImplementedError("pygame event loop does not support sockets")
+    async def sock_accept(self, sock: socket) -> tuple:
+        raise NotImplementedError("pygame event loop does not support sockets")
+    async def sock_sendfile(self, sock: socket, file: object, offset: int = 0, count: int | None = None, fallback: bool | None = True) -> int:
+        raise NotImplementedError("pygame event loop does not support sockets")
+
+    async def getaddrinfo(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support DNS")
+    async def getnameinfo(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support DNS")
+    
+    async def connect_read_pipe(self, protocol_factory: Any, pipe: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support pipes")
+    async def connect_write_pipe(self, protocol_factory: Any, pipe: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support pipes")
+    def add_signal_handler(self, signum: int, callback: Callable[..., object], *args: Any) -> None:
+        raise NotImplementedError("pygame event loop does not support signal handlers")
+    def remove_signal_handler(self, sig: int) -> bool:
+        raise NotImplementedError("pygame event loop does not support signal handlers")
+    
+    async def subprocess_exec(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support subprocesses")
+    async def subprocess_shell(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support subprocesses")
+    
+    async def create_connection(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support creating network connections")
+    async def create_datagram_endpoint(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support creating datagram endpoints")
+    async def create_unix_connection(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support creating Unix connections")
+    async def create_server(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support creating network servers")
+    async def create_unix_server(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support creating Unix servers")
+    async def connect_accepted_socket(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support connecting accepted sockets")
+    

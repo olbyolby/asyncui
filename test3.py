@@ -63,3 +63,30 @@ def forceCopy(instance: T) -> T:
     vars(newInstance).update(vars(instance))
     return newInstance
 
+from typing import Never
+
+
+from typing import Final, Any, Self
+Tco = TypeVar('Tco', covariant=True)
+Tcon = TypeVar('Tcon', contravariant=True)
+class ReadableProperty(Protocol[Tco]):
+    @overload
+    def __get__(self, instance: None, owner: type[Any] | None = None) -> Self: ...
+    @overload
+    def __get__(self, instance: Any, owner: type[Any] | None = None) -> Tco:
+        ...
+
+from functools import cached_property
+class Test:
+    @property
+    def x(self) -> int:
+        return 4
+class Test2(Test):
+    @cached_property
+    def x(self) -> int:
+        return 4
+    
+Test().x = 4
+reveal_type(Test.x)
+reveal_type(Test().x)
+reveal_type(cached_property.__set__)

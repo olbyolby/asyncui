@@ -1,4 +1,4 @@
-from typing import Union, cast, Generic, TypeVar, TypeVar, overload, Type, Self, TypeVarTuple, Awaitable, Callable
+from typing import Union, cast, Generic, TypeVar, TypeVar, overload, Type, Self, TypeVarTuple, Awaitable, Callable, Protocol, Never
 from types import EllipsisType
 from functools import wraps
 import asyncio
@@ -134,3 +134,21 @@ class Flag:
     def unset(self) -> None:
         self._state = False
 
+from typing import Any
+Tco = TypeVar('Tco', covariant=True)
+Tcon = TypeVar('Tcon', contravariant=True)
+class ReadableProperty(Protocol[Tco]):
+    def __get__(self, instance: Any, owner: type[Any]) -> Tco:
+        ...
+    def __set__(self, instance: Any, value: Never) -> Never:
+        ...
+class ReadOnlyProperty(ReadableProperty[Tco]):
+    __set__: Never
+    
+T3 = TypeVar('T3')
+
+class FuckOff():
+    x = Placeholder[int]()
+
+reveal_type(FuckOff.x)
+reveal_type(FuckOff().x)

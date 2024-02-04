@@ -2,8 +2,8 @@ from __future__ import annotations
 from types import EllipsisType
 from asyncUi.display import Point
 from .util import Placeholder, Inferable, Flag, EventDispatcher
-from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler
-from typing import Final, Self, Callable, Protocol, Sequence
+from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler, Rectangular
+from typing import Final, Self, Callable, Protocol, Sequence, final
 from functools import cached_property as cachedProperty, wraps
 from .resources.fonts import Font
 from contextlib import ExitStack
@@ -18,8 +18,8 @@ def renderAll(window: pygame.Surface, scale: float, *targets: Drawable) -> None:
 class Box(Drawable):
     filledBox: Final = 0
 
-    size = Placeholder[Size]()
     color = Placeholder[Color]()
+    size = Placeholder[Size]()
     def __init__(self, position: Inferable[Point], size: Inferable[Size], color: Inferable[Color], thinkness: int = filledBox):
         self.position = position
         self.size = size
@@ -42,6 +42,7 @@ class Box(Drawable):
         return Box(scale.point(self.position), scale.size(self.size), self.color, self.thinkness)
 
 class Image(Drawable):
+    size = Placeholder[Size]((0,0))
     def __init__(self, position: Inferable[Point], surface: pygame.Surface, size: Size | None = None) -> None:
         self.position = position
         self.surface = pygame.transform.scale(surface, size) if size is not None else surface
@@ -72,6 +73,8 @@ class Image(Drawable):
     @cachedProperty
     def body(self) -> pygame.Rect:
         return pygame.Rect(self.position, self.size)
+    
+
 class Text(Drawable):
     text = Placeholder[str]('')
     def __init__(self, position: Inferable[Point], font: Font, size: int, color: Color, text: Inferable[str]) -> None:
@@ -87,9 +90,11 @@ class Text(Drawable):
         self._cachedScale = 1.
         self._cachedText: pygame.Surface | None = None
 
-    @cachedProperty
-    def size(self) -> Size:
-        return self.font[self.fontSize].size(self.text)
+    
+    
+    size = cachedProperty(lambda self: self.font[self.fontSize].size(self.text))
+
+
     @cachedProperty
     def body(self) -> pygame.Rect:
         return pygame.Rect(*self.position, *self.size)
@@ -118,7 +123,6 @@ class Text(Drawable):
     @rescaler
     def rescale(self, scale: Scale) -> 'Text':
         return Text(scale.point(self.position), self.font, scale.fontSize(self.fontSize), self.color, self.text)
-
 
 from . import events
 from . window import eventHandlerMethod, Window
@@ -276,10 +280,9 @@ class InputBoxDisplay(Drawable):
     @cachedProperty
     def body(self) -> pygame.Rect:
         return self.background.body
-    @cachedProperty
-    def size(self) -> Size:
-        return self.background.size
     
+    size = cachedProperty[Size](lambda s: s.background.size)
+
 class InputBox(Drawable, AutomaticStack):
     """
     Basic text input box, wraps `InputBoxDisplay` to allow reacting to user input
@@ -348,24 +351,35 @@ class InputBox(Drawable, AutomaticStack):
 def addPoint(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
     return a[0] + b[0], a[1] + b[1]
 class Group(Drawable, AutomaticStack):
-    def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable]) -> None:
+    
+    def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable], widgetPositions: Inferable[Sequence[Point]] = ...) -> None:
         self.position = position
-        if position is not ...:
-            self.widgets: Sequence[Drawable] = [widget.reposition(addPoint(widget.position, position)) for widget in widgets]
+  
+        if widgetPositions is ...:
+            self.orignalPositions: Sequence[Point] = [widget.position for widget in widgets]
         else:
-            self.widgets = widgets
+            self.orignalPositions = widgetPositions
+        if position is not ...:
+            self._widgets: Sequence[Drawable] = [widget.reposition(addPoint(widgetPosition, position)) for widget, widgetPosition in zip(widgets, self.orignalPositions)]
+        else:
+            self._widgets = widgets
     
     def draw(self, window: pygame.Surface, scale: float) -> None:
-        for widget in self.widgets:
+        for widget in self._widgets:
             widget.draw(window, scale)
     
     def reposition(self, position: Point | EllipsisType) -> 'Group':
-        return Group(position, self.widgets)
+        return Group(position, self._widgets, self.orignalPositions)
+    
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
-        for widget in self.widgets:
+        for widget in self._widgets:
             if isinstance(widget, AutomaticStack):
                 stack.enter_context(widget)
 
 
+
+
+
+    

@@ -1,14 +1,14 @@
 import pygame
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar, Generic, Protocol
-from .util import Placeholder
+from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar, Generic, Protocol, Final
+from .util import Placeholder, ReadableProperty, ReadOnlyProperty
 from .resources import fonts
 from .window import Window
 from contextlib import ExitStack
 from abc import abstractmethod
 from types import TracebackType, EllipsisType
-from functools import wraps
+from functools import wraps, cached_property as cachedProperty
 
 __all__ = [
     'Color',
@@ -41,10 +41,10 @@ class Drawable(ABC):
     def reposition(self, position: Point | EllipsisType, /) -> Self:
         ...
 
-    position = Placeholder[Point]((0, 0))
+    position: Placeholder[Point] = Placeholder[Point]((0, 0))
+    size: Placeholder[Size] | cachedProperty[Size]
 
-
-class Scale:
+class Scale: 
     def __init__(self, scale: float) -> None:
         self.scaleFactor = scale
     def rect(self, rect: pygame.Rect) -> pygame.Rect:
@@ -134,3 +134,16 @@ def drawableRenderer(target: Drawable) -> Callable[[Window], None]:
     def wrapper(window: Window) -> None:
         target.draw(window.window, window.scaleFactor)
     return wrapper
+
+
+
+class Rectangular(Protocol):
+    @abstractmethod
+    @property
+    def body(self) -> pygame.Rect:
+        ...
+
+    @abstractmethod
+    @property
+    def size(self) -> Size:
+        ...
