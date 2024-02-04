@@ -2,8 +2,8 @@ from __future__ import annotations
 from types import EllipsisType
 from asyncUi.display import Point
 from .util import Placeholder, Inferable, Flag
-from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip
-from typing import Final, Self, Callable
+from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler
+from typing import Final, Self, Callable, Protocol, Sequence
 from functools import cached_property as cachedProperty, wraps
 from .resources.fonts import Font
 from contextlib import ExitStack
@@ -35,12 +35,16 @@ class Box(Drawable):
         pygame.draw.rect(window, self.color, scale.rect(self.body), self.thinkness)       
 
     def reposition(self, position: Inferable[Point]) -> 'Box':
-        return Box(position, self.size, self.color)     
+        return Box(position, self.size, self.color)   
+
+    @rescaler
+    def rescale(self, scale: Scale) -> 'Box':
+        return Box(scale.point(self.position), scale.size(self.size), self.color, self.thinkness)
 
 class Image(Drawable):
     def __init__(self, position: Inferable[Point], surface: pygame.Surface, size: Size | None = None) -> None:
         self.position = position
-        self.surface = surface
+        self.surface = pygame.transform.scale(surface, size) if size is not None else surface
         self.size = size if size is not None else surface.get_size()
 
         # Scaling images so slow, so cache it and update the cache when the scale is changed
@@ -60,7 +64,14 @@ class Image(Drawable):
         return Image(position, self.surface, self.size)
     def resize(self, size: Size) -> 'Image':
         return Image(self.position, self.surface, size)
+    
+    @rescaler
+    def rescale(self, scale: Scale) -> 'Image':
+        return Image(scale.point(self.position), self.surface, scale.size(self.size))
 
+    @cachedProperty
+    def body(self) -> pygame.Rect:
+        return pygame.Rect(self.position, self.size)
 class Text(Drawable):
     text = Placeholder[str]('')
     def __init__(self, position: Inferable[Point], font: Font, size: int, color: Color, text: Inferable[str]) -> None:
@@ -104,7 +115,9 @@ class Text(Drawable):
     def changeText(self, text: str) -> 'Text':
         return Text(self.position, self.font, self.fontSize, self.color, text)
     
-
+    @rescaler
+    def rescale(self, scale: Scale) -> 'Text':
+        return Text(scale.point(self.position), self.font, scale.fontSize(self.fontSize), self.color, self.text)
 
 
 from . import events
@@ -225,12 +238,13 @@ class InputBoxDisplay(Drawable):
         self.cursorBox = Box(self.text.characterPosition(cursorPosition), (2, self.text.height), self.text.color)
         self.cursorPosition  = cursorPosition
 
-    def draw(self, window: pygame.Surface, scale: float) -> None:
-        with Clip(window, self.background.body):
-            self.background.draw(window, scale)
-            self.text.draw(window, scale)
+    @renderer
+    def draw(self, window: pygame.Surface, scale: Scale) -> None:
+        with Clip(window, scale.rect(self.background.body)):
+            self.background.draw(window, scale.scaleFactor)
+            self.text.draw(window, scale.scaleFactor)
             if self.showCursor:
-                self.cursorBox.draw(window, scale)
+                self.cursorBox.draw(window, scale.scaleFactor)
     
     def reposition(self, position: Point | EllipsisType) -> 'InputBoxDisplay':
         return InputBoxDisplay(position, self.text, self.background, self.cursorPosition, self.showCursor)
@@ -255,6 +269,10 @@ class InputBoxDisplay(Drawable):
     def changeCursorShown(self, state: bool) -> 'InputBoxDisplay':
         return InputBoxDisplay(self.position, self.text, self.background, self.cursorPosition, state)
     
+    @rescaler
+    def rescale(self, scale: Scale) -> 'InputBoxDisplay':
+        return InputBoxDisplay(scale.point(self.position), self.text.rescale(scale.scaleFactor), self.background.rescale(scale.scaleFactor), self.cursorPosition, self.showCursor)
+
     @cachedProperty
     def body(self) -> pygame.Rect:
         return self.background.body
@@ -290,6 +308,8 @@ class InputBox(Drawable, AutomaticStack):
         self.textBox.draw(window, scale)
     def reposition(self, position: Point | EllipsisType) -> 'InputBox':
         return InputBox(self.textBox.reposition(position), self.onEnter)
+    def rescale(self, factor: float) -> 'InputBox':
+        return InputBox(self.textBox.rescale(factor), self.onEnter)
 
     def _onFocus(self) -> None:
         self.textBox = self.textBox.changeCursorShown(True)
@@ -323,3 +343,29 @@ class InputBox(Drawable, AutomaticStack):
         stack.enter_context(self._textInput)
         stack.enter_context(self._keyDown)
         stack.enter_context(self._focuser)
+
+
+def addPoint(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
+    return a[0] + b[0], a[1] + b[1]
+class Group(Drawable, AutomaticStack):
+    def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable]) -> None:
+        self.position = position
+        if position is not ...:
+            self.widgets: Sequence[Drawable] = [widget.reposition(addPoint(widget.position, position)) for widget in widgets]
+        else:
+            self.widgets = widgets
+    
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        for widget in self.widgets:
+            widget.draw(window, scale)
+    
+    def reposition(self, position: Point | EllipsisType) -> 'Group':
+        return Group(position, self.widgets)
+
+    @stackEnabler
+    def enable(self, stack: ExitStack) -> None:
+        for widget in self.widgets:
+            if isinstance(widget, AutomaticStack):
+                stack.enter_context(widget)
+
+

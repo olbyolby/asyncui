@@ -1,4 +1,4 @@
-from typing import TypeVar, TypeVarTuple, Generic, Callable, Sequence, Iterable, Generator, no_type_check, Any, overload, Union
+from typing import TypeVar, TypeVarTuple, Generic, Callable, Sequence, Iterable, Generator, no_type_check, Any, overload, Union, Protocol
 from types import EllipsisType
 
 
@@ -62,3 +62,4 @@ def forceCopy(instance: T) -> T:
     newInstance = object.__new__(type(instance))
     vars(newInstance).update(vars(instance))
     return newInstance
+

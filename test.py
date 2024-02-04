@@ -4,7 +4,7 @@ import asyncio
 from abc import *
 from asyncUi.window import Window, EventHandler
 from asyncUi.graphics import Box, Text, Clickable, Hoverable, Focusable, InputBoxDisplay, InputBox
-from asyncUi.display import Color
+from asyncUi.display import Color, drawableRenderer
 from asyncUi.resources import fonts
 from asyncUi import events
 import pygame
@@ -18,18 +18,8 @@ def exiter(event: events.Quit) -> Never:
 exiter.register()
 
 arial = fonts.fontManager.loadSystemFont('arial')
-inputter = InputBox(InputBoxDisplay((0, 0), Text(..., arial, 16, Color(255, 255, 255), "Hello world!"), Box(..., (100, 25), Color(255, 0, 0)), 2), lambda text: print('you entered ', text)).__enter__()
-async def renderer() -> Never:
-    while True:
-        start = asyncio.get_event_loop().time()
-        inputter.draw(window.window, window.scaleFactor)
-        pygame.display.flip()
-        end = asyncio.get_event_loop().time()
-        await asyncio.sleep(1/30 - end - start)
-
-asyncio.create_task(renderer())
-
-
+inputter = InputBox(InputBoxDisplay((0, 0), Text(..., arial, 16, Color(255, 255, 255), "Hello world!"), Box(..., (100, 25), Color(255, 0, 0)), 2), lambda text: print('you entered ', text)).rescale(2).__enter__()
+window.startRenderer(30, drawableRenderer(inputter))
 
 
 @EventHandler

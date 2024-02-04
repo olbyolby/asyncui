@@ -1,6 +1,7 @@
 import pygame
+import asyncio
 from abc import ABC, abstractmethod
-from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar
+from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar, Generic, Protocol
 from .util import Placeholder
 from .resources import fonts
 from .window import Window
@@ -20,6 +21,8 @@ __all__ = [
     'renderer'
 ]
 
+T = TypeVar('T')
+
 class Color(NamedTuple):
     red: int
     green: int
@@ -37,8 +40,10 @@ class Drawable(ABC):
     @abstractmethod
     def reposition(self, position: Point | EllipsisType, /) -> Self:
         ...
+
     position = Placeholder[Point]((0, 0))
-    
+
+
 class Scale:
     def __init__(self, scale: float) -> None:
         self.scaleFactor = scale
@@ -100,11 +105,18 @@ def stackEnabler(function: Callable[[_AutoStackT, ExitStack], None]) -> Callable
             self._stack = stack.pop_all()
     return wrapper
 
-T = TypeVar('T')
+
 def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[T, pygame.Surface, float], None]:
     @wraps(function)
     def wrapper(self: T, window: pygame.Surface, scale: float) -> None:
         return function(self, window, Scale(scale))
+    return wrapper
+
+DrawableT = TypeVar('DrawableT', bound=Drawable)
+def rescaler(function: Callable[[T, Scale], T]) -> Callable[[T, float], T]:
+    @wraps(function)
+    def wrapper(self: T, scale: float) -> T:
+        return function(self, Scale(scale))
     return wrapper
 
 class Clip:
@@ -117,3 +129,8 @@ class Clip:
         return self
     def __exit__(self, exceptionType: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
         self.target.set_clip(self.oldClip)
+
+def drawableRenderer(target: Drawable) -> Callable[[Window], None]:
+    def wrapper(window: Window) -> None:
+        target.draw(window.window, window.scaleFactor)
+    return wrapper

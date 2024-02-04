@@ -220,6 +220,26 @@ def _isEventLoopRunning() -> bool:
     else:
         return True
 
+class Renderer:
+    def __init__(self, fps: int, renderer: Callable[['Window'], None]) -> None:
+        self._running = False
+        self.renderer = renderer
+        self.fps = fps
+    def stop(self) -> None:
+        self._running = False
+    def running(self) -> bool:
+        return self._running
+
+    async def _runner(self) -> None:
+        while self._running:
+            start = Window().time()
+            self.renderer(Window())
+            pygame.display.flip()
+            end = Window().time()
+            await asyncio.sleep(1/self.fps - (end - start))
+    def _run(self) -> None:
+        self._running = True
+        asyncio.ensure_future(self._runner())
 
 class Window(asyncio.AbstractEventLoop): 
     
@@ -235,6 +255,7 @@ class Window(asyncio.AbstractEventLoop):
         self.eventHandlers: dict[int, set[Callable[[Any], None]]] = {}
         self.timers = TimerList()
         self.orginalSize = window.get_size()
+        self.renderer: Renderer | None = None
 
         self.registerEventHandler(ExacuteCallbackEvent, self._run_exacute_callback)
         self.registerEventHandler(events.VideoResize, self._resizeHandler)
@@ -280,6 +301,12 @@ class Window(asyncio.AbstractEventLoop):
     def scaleFactor(self) -> float:
         return self.window.get_size()[0]/self.orginalSize[0]
 
+    def startRenderer(self, fps: int, renderer: Callable[['Window'], None]) -> Renderer:
+        if self.renderer is not None and self.renderer.running():
+            raise RuntimeError("Renderer already running")
+        self.renderer = Renderer(fps, renderer)
+        self.renderer._run()
+        return self.renderer
     # Scheduling callbacks for asyncio
     def callSoon(self, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.Handle:
         handle = asyncio.Handle(callback, args, self, context)
