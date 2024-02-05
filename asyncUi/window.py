@@ -383,6 +383,7 @@ class Window(asyncio.AbstractEventLoop):
 
         self.closed= False
         self.running = False
+        self.debug = __debug__
 
         self.errorHandler: Callable[['Window', dict[Any, Any]], None] | None = None
         asyncio._set_running_loop(self)
@@ -492,7 +493,13 @@ class Window(asyncio.AbstractEventLoop):
         if executor is None:
             executor = self.defaultExecutor
         return asyncio.wrap_future(executor.submit(function, *args))
-    run_in_executor = runInExecutor #type: ignore
+    run_in_executor = cast(Any, runInExecutor)
+    def set_default_executor(self, executor: Executor) -> None:
+        self.defaultExecutor.shutdown(cancel_futures=True)
+        self.defaultExecutor = executor
+    async def shutdown_default_executor(self, timeout: int | None = None) -> None:
+        assert timeout == None, "timeout not supported in shutdown executor"
+        self.defaultExecutor.shutdown(cancel_futures=True)
 
     #Factories 
     def create_future(self) -> asyncio.Future[Any]:
@@ -506,7 +513,9 @@ class Window(asyncio.AbstractEventLoop):
     
     #Compatibility
     def get_debug(self) -> bool:
-        return __debug__
+        return self.debug
+    def set_debug(self, value: bool) -> None:
+        self.debug = value
 
     #Running events
 

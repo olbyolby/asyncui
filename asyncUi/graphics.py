@@ -3,7 +3,7 @@ from types import EllipsisType
 from asyncUi.display import Point
 from .util import Placeholder, Inferable, Flag, EventDispatcher
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler, Rectangular
-from typing import Final, Self, Callable, Protocol, Sequence, final
+from typing import Iterable, Final, Self, Callable, Protocol, Sequence, final
 from functools import cached_property as cachedProperty, wraps
 from .resources.fonts import Font
 from contextlib import ExitStack
@@ -371,6 +371,23 @@ class Group(Drawable, AutomaticStack):
     def reposition(self, position: Point | EllipsisType) -> 'Group':
         return Group(position, self._widgets, self.orignalPositions)
     
+    @staticmethod
+    def _boundingRect(rects: Iterable[pygame.Rect]) -> pygame.Rect:
+        minX, minY, maxH, maxW = 0, 0, 0, 0
+        for rect in rects:
+            minX = min(minX, rect.x)
+            minY = min(minY, rect.y)
+            maxH = max(maxH, rect.height)
+            maxW = max(maxW, rect.width)
+        return pygame.Rect(minX, minY, maxW, maxH)
+    
+    @cachedProperty
+    def body(self) -> pygame.Rect:
+        return self._boundingRect((widget.body for widget in self._widgets))
+    
+    @cachedProperty
+    def size(self) -> Size:
+        return self.body.width, self.body.height
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:

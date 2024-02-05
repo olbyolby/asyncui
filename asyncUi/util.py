@@ -147,8 +147,3 @@ class ReadOnlyProperty(ReadableProperty[Tco]):
     
 T3 = TypeVar('T3')
 
-class FuckOff():
-    x = Placeholder[int]()
-
-reveal_type(FuckOff.x)
-reveal_type(FuckOff().x)

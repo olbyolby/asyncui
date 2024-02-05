@@ -22,7 +22,7 @@ arial = fonts.fontManager.loadSystemFont('arial')
 def renderer(window: Window) -> None:
     pass
 
-
+asyncio.ensure_future(window.run_in_executor(None, print, "Hello world!"))
 
 window.startRenderer(30, renderer)
 

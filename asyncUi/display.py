@@ -32,6 +32,7 @@ Point = tuple[int, int]
 
 Size = tuple[int, int]
 
+Rect = pygame.Rect
 class Drawable(ABC):
     @abstractmethod
     def draw(self, window: pygame.Surface, scale: float, /) -> None:
@@ -43,6 +44,8 @@ class Drawable(ABC):
 
     position: Placeholder[Point] = Placeholder[Point]((0, 0))
     size: Placeholder[Size] | cachedProperty[Size]
+
+    body: cachedProperty[Rect] | Placeholder[Rect] = cachedProperty[Rect](lambda s: Rect(s.position, s.size))
 
 class Scale: 
     def __init__(self, scale: float) -> None:
@@ -138,12 +141,12 @@ def drawableRenderer(target: Drawable) -> Callable[[Window], None]:
 
 
 class Rectangular(Protocol):
-    @abstractmethod
     @property
+    @abstractmethod
     def body(self) -> pygame.Rect:
         ...
 
-    @abstractmethod
     @property
+    @abstractmethod
     def size(self) -> Size:
         ...
