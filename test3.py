@@ -76,17 +76,3 @@ class ReadableProperty(Protocol[Tco]):
     def __get__(self, instance: Any, owner: type[Any] | None = None) -> Tco:
         ...
 
-from functools import cached_property
-class Test:
-    @property
-    def x(self) -> int:
-        return 4
-class Test2(Test):
-    @cached_property
-    def x(self) -> int:
-        return 4
-    
-Test().x = 4
-reveal_type(Test.x)
-reveal_type(Test().x)
-reveal_type(cached_property.__set__)

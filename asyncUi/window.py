@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from threading import Lock
 from types import EllipsisType, TracebackType
 from functools import singledispatch
+from concurrent.futures import Executor, ThreadPoolExecutor
+from concurrent import futures
 
 import logging
 logger = logging.getLogger(__name__)
@@ -313,6 +315,7 @@ class Renderer:
         self.renderer = renderer
         self.fps = fps
     def stop(self) -> None:
+        logger.info(f'stopped renderer {self}')
         self._running = False
     def running(self) -> bool:
         return self._running
@@ -373,6 +376,7 @@ class Window(asyncio.AbstractEventLoop):
         self.timers = TimerList()
         self.orginalSize = window.get_size()
         self.renderer: Renderer | None = None
+        self.defaultExecutor: Executor = ThreadPoolExecutor(5)
 
         self.registerEventHandler(ExecuteCallbackEvent, self._run_exacute_callback)
         self.registerEventHandler(events.VideoResize, self._resizeHandler)
@@ -385,6 +389,7 @@ class Window(asyncio.AbstractEventLoop):
     
     #Event handler processing
     def registerEventHandler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
+        logger.debug(f"Registered event handler {handler!r} for event type {eventType.__qualname__!r}")
         """
         Register an event handler for a given event type
         
@@ -395,6 +400,7 @@ class Window(asyncio.AbstractEventLoop):
 
         self.eventHandlers[eventType.type].add(handler)
     def unregisterEventHandler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
+        logger.debug(f"Unregistered event handler {handler!r} for event type {eventType.__qualname__}")
         """
         unregister an event handler for a given event type,
         raises a ValueError if the event handler is not registered
@@ -447,6 +453,7 @@ class Window(asyncio.AbstractEventLoop):
         Starts rendering via the renderer function at the given FPS,
         returning a Rederer instance.
         """
+        logger.info(f"created renderer with fps={fps}")
         if self.renderer is not None and self.renderer.running():
             raise RuntimeError("Renderer already running")
         self.renderer = Renderer(fps, renderer)
@@ -473,11 +480,19 @@ class Window(asyncio.AbstractEventLoop):
         return handle
     call_at = callAt #type: ignore #Same reason as callSoon
 
+    # Time/timeouts
     def _timer_handle_cancelled(self, timer: asyncio.TimerHandle) -> None:
         self.timers.cancel(timer)
-    # Time
+
     def time(self) -> float:
         return time.monotonic()
+
+    # Exceutors
+    def runInExecutor(self, executor: Executor | None, function: Callable[[*Ts], T], *args: *Ts) -> asyncio.Future[T]:
+        if executor is None:
+            executor = self.defaultExecutor
+        return asyncio.wrap_future(executor.submit(function, *args))
+    run_in_executor = runInExecutor #type: ignore
 
     #Factories 
     def create_future(self) -> asyncio.Future[Any]:
@@ -502,12 +517,20 @@ class Window(asyncio.AbstractEventLoop):
         event.handle._run()
     def _handleEvent(self, event: events.Event) -> None:
         """
-        Exactue every event handler assosated with an event
+        Execaute every event handler assosated with an event
         """
         if event.type not in self.eventHandlers:
             return 
         for handler in frozenset(self.eventHandlers[event.type]):
-            handler(event)
+            try:
+                handler(event)
+            except Exception as e:
+                context: dict[str, object] = {}
+                context['exception'] = e
+                context['event'] = event
+                context['handler'] = handler
+                self.call_exception_handler(context)
+
             #self.callSoon(handler, event)
 
     def _waitForEvent(self) -> events.Event:
@@ -517,9 +540,24 @@ class Window(asyncio.AbstractEventLoop):
         else:
             return cast(events.Event, pygame.event.wait(int(soonestEvent*1000)))
     def run(self) -> None:
+        logger.info(f'{self!r} begain event loop')
         self.running = True
         while self.running:
             self._handleEvent(self._waitForEvent())
+        logger.info(f'{self!r} stoped event loop')
+    run_forever = run
+
+    def run_until_complete(self, future: Generator[Any, None, T] | Awaitable[T]) -> T:
+        if isinstance(future, Generator):
+            future = asyncio.create_task(future)
+        future = asyncio.ensure_future(future)
+        
+        self.running = True
+        future.add_done_callback(lambda f: self.stop())
+        self.run()
+
+        # The future should now be done
+        return future.result()
 
     def stop(self) -> None:
         self.running = False
@@ -527,7 +565,11 @@ class Window(asyncio.AbstractEventLoop):
         return self.running
     is_running = isRunning
 
-
+    def close(self) -> None:
+        #This is a singleton, you can't close a singleton...
+        pass
+    def is_closed(self) -> bool:
+        return self.closed
 
     # Exception handling
     def default_exception_handler(self, context: dict[Any, Any]) -> None:
@@ -569,6 +611,7 @@ class Window(asyncio.AbstractEventLoop):
                 raise RuntimeError(f"{__name__} is not initialized")
             self = super().__new__(cls)
             cls.__instance = self
+            logger.info(f"created window with size={window.get_size()} and title={title!r}")
             return self
         else:
             #if an instance is set, you can't provide init data.
@@ -604,7 +647,7 @@ class Window(asyncio.AbstractEventLoop):
             raise NotImplementedError("pygame event loop does not support sockets")
     async def sock_connect(self, sock: socket, address: Any) -> None:
         raise NotImplementedError("pygame event loop does not support sockets")
-    async def sock_accept(self, sock: socket) -> tuple:
+    async def sock_accept(self, sock: socket) -> Any:
         raise NotImplementedError("pygame event loop does not support sockets")
     async def sock_sendfile(self, sock: socket, file: object, offset: int = 0, count: int | None = None, fallback: bool | None = True) -> int:
         raise NotImplementedError("pygame event loop does not support sockets")

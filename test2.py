@@ -190,10 +190,10 @@ class EventDispatcher(Generic[*Ts]):
         self.listeners.remove(listener)
     def listen(self) -> Awaitable[tuple[*Ts]]:
         future = asyncio.Future[tuple[*Ts]]()
-        @self.addListener
         def resolver(*results: *Ts) -> None:
             self.removeListener(resolver)
-            future.set_result(*results)
+            future.set_result(results)
+        self.addListener(resolver)
         return future
     
     async def notify(self, *data: *Ts) -> None:
@@ -206,7 +206,7 @@ CallbackArgument = Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts
 
 import gc
 from typing import TypeVar, Type
-T2 = TypeVar('T2')
+
 def unperson(victim: object) -> None:
     """
     "Unperson" an object
