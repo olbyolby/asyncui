@@ -387,6 +387,7 @@ class Window(asyncio.AbstractEventLoop):
 
         self.errorHandler: Callable[[asyncio.AbstractEventLoop, dict[str, Any]], object] | None = None
         asyncio._set_running_loop(self)
+
     
     #Event handler processing
     def registerEventHandler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
@@ -633,7 +634,8 @@ class Window(asyncio.AbstractEventLoop):
             
             return cls.__instance
 
-
+    def hasInstance(self) -> bool:
+        return self.__instance is not None
 
 
     # A pile of bullshit I don't know how to implement in pygame
@@ -702,4 +704,11 @@ class Window(asyncio.AbstractEventLoop):
     async def start_tls(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("pygame event loop does not support start_tls")
     
-    
+import threading
+class WindowEventLoopPolicy(asyncio.AbstractEventLoopPolicy):
+
+    def new_event_loop(self) -> asyncio.AbstractEventLoop:
+        if threading.current_thread() is threading.main_thread():
+            return Window()
+        return super().new_event_loop()
+            

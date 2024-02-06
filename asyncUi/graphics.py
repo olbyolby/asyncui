@@ -3,7 +3,7 @@ from types import EllipsisType
 from asyncUi.display import Point
 from .util import Placeholder, Inferable, Flag, EventDispatcher, listify
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler, Rectangular
-from typing import Iterable, Final, Self, Callable, Protocol, Sequence, final
+from typing import TypeVar, Iterable, Final, Self, Callable, Protocol, Sequence, final
 from functools import cached_property as cachedProperty, wraps
 from .resources.fonts import Font
 from contextlib import ExitStack
@@ -370,11 +370,12 @@ class Group(Drawable, AutomaticStack):
             yield widget.reposition(addPoint(position, self.position))
 
     def draw(self, window: pygame.Surface, scale: float) -> None:
+        
         for widget in self._widgets:
             widget.draw(window, scale)
     
-    def reposition(self, position: Point | EllipsisType) -> 'Group':
-        return Group(position, self._widgets, self.orignalPositions)
+    def reposition(self, position: Point | EllipsisType) -> Self:
+        return type(self)(position, self._widgets, self.orignalPositions)
     
     @staticmethod
     def _boundingRect(rects: Iterable[pygame.Rect]) -> pygame.Rect:
@@ -402,3 +403,16 @@ class Group(Drawable, AutomaticStack):
             if isinstance(widget, AutomaticStack):
                 stack.enter_context(widget)
 
+class ToolBar(Group):
+    @listify
+    def _positioner(self, widgets: Sequence[Drawable], positions: Sequence[Point]) -> Iterable[Drawable]:
+        xOffset = self.position[0]
+        for widget in widgets:
+            yield widget.reposition((xOffset, self.position[1]))
+            xOffset += widget.body.width
+
+DrawableT = TypeVar('DrawableT', bound=Drawable)
+def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
+    x = outter.position[0] + (outter.size[0] - inner.size[0])//2
+    y = outter.position[1] + (outter.size[1] - inner.size[1])//2
+    return inner.reposition((x, y))

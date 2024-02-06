@@ -3,7 +3,7 @@ from types import EllipsisType
 import asyncio
 from abc import *
 from asyncUi.window import Window, EventHandler
-from asyncUi.graphics import Box, Text, Clickable, Hoverable, Focusable, InputBoxDisplay, InputBox
+from asyncUi.graphics import Group, Box, Text, Clickable, Hoverable, Focusable, InputBoxDisplay, InputBox, ToolBar, centered
 from asyncUi.display import Color, drawableRenderer, Point, Color
 from asyncUi.resources import fonts
 from asyncUi import events
@@ -19,12 +19,19 @@ exiter.register()
 
 arial = fonts.fontManager.loadSystemFont('arial')
 
-def renderer(window: Window) -> None:
-    pass
+bar = ToolBar((0,0), [
+    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 1"),
+    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 2"),
+    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 3"),
+    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 4"),
+])
 
-asyncio.ensure_future(window.run_in_executor(None, print, "Hello world!"))
+box = Box((50, 50), (100, 50), Color(255, 0, 0))
+text = centered(box, Text(..., arial, 16, Color(255, 255, 255), "hello"))
 
-window.startRenderer(30, renderer)
+objects = Group((0,0), [box, text, bar])
+
+window.startRenderer(30, drawableRenderer(objects))
 
 
 window.run()
