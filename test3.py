@@ -67,12 +67,68 @@ from typing import Never
 
 
 from typing import Final, Any, Self
-Tco = TypeVar('Tco', covariant=True)
-Tcon = TypeVar('Tcon', contravariant=True)
-class ReadableProperty(Protocol[Tco]):
-    @overload
-    def __get__(self, instance: None, owner: type[Any] | None = None) -> Self: ...
-    @overload
-    def __get__(self, instance: Any, owner: type[Any] | None = None) -> Tco:
-        ...
 
+
+
+GetT = TypeVar('GetT')
+SetT = TypeVar('SetT')
+
+class ReadableProperty(Generic[GetT, T]):
+    def __init__(self, getter: Callable[[T], GetT]) -> None:
+        self.getter = getter
+
+    @overload
+    def __get__(self, instance: T, owner: type[T]) -> GetT: ...
+    @overload
+    def __get__(self, instance: None, owner: type[T]) -> Self: ...
+
+    def __get__(self, instance: T | None, owner: type[T]) -> Self | GetT: 
+        if instance is None:
+            return self
+        return self.getter(instance)
+
+class WritableProperty(Generic[SetT, T]):
+    def __init__(self, setter: Callable[[T, SetT], None]) -> None:
+        self.setter = setter
+    def __set__(self, instance: T, value: SetT) -> None:
+        self.setter(instance, value)
+
+class Property(ReadableProperty[GetT, T], WritableProperty[SetT, T], Generic[GetT, SetT, T]):
+    def __init__(self, getter: Callable[[T], GetT], setter: Callable[[T, SetT], None]) -> None:
+        ReadableProperty.__init__(self, getter)
+        WritableProperty.__init__(self, setter)
+
+
+class Matrix(Generic[T]):
+    def __init__(self) -> None:
+        self.data: list[list[T]] = []
+        self.rowCount = 0
+        self.columnCount = 0
+    def __getitem__(self, pos: tuple[int, int]) -> T:
+        row, column = pos
+        return self.data[row][column]
+    def __setitem__(self, pos: tuple[int, int], value: T) -> None:
+        row, column = pos
+        self.data[row][column] = value 
+    def appendRow(self, rowData: Iterable[T]) -> None:
+        rowData = list(rowData)
+        if len(rowData) != self.rowCount:
+            raise ValueError(f'Rows must have the same length(expected {self.rowCount}, got {len(rowData)})')
+
+        self.rowCount += 1
+        self.data.append(rowData)
+    def appendColumn(self, columnData: Iterable[T]) -> None:
+        columnData = list(columnData)
+        if len(columnData) != self.columnCount:
+            raise ValueError(f'Columns must have the same length(expected {self.columnCount}, got {len(columnData)})')
+        
+        self.columnCount += 1
+        for row, data in zip(self.data, columnData):
+            row.append(data)
+        
+    def rows(self) -> Iterable[list[T]]:
+        for row in self.data:
+            yield row
+        
+    
+    

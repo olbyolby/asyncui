@@ -1,7 +1,7 @@
 from __future__ import annotations
 from types import EllipsisType
 from asyncUi.display import Point
-from .util import Placeholder, Inferable, Flag, EventDispatcher
+from .util import Placeholder, Inferable, Flag, EventDispatcher, listify
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler, Rectangular
 from typing import Iterable, Final, Self, Callable, Protocol, Sequence, final
 from functools import cached_property as cachedProperty, wraps
@@ -26,7 +26,7 @@ class Box(Drawable):
         self.color = color
         self.thinkness = thinkness
     
-    @cachedProperty
+    @cachedProperty[pygame.Rect]
     def body(self) -> pygame.Rect:
         return pygame.Rect(*self.position, *self.size)
     
@@ -70,7 +70,7 @@ class Image(Drawable):
     def rescale(self, scale: Scale) -> 'Image':
         return Image(scale.point(self.position), self.surface, scale.size(self.size))
 
-    @cachedProperty
+    @cachedProperty[pygame.Rect]
     def body(self) -> pygame.Rect:
         return pygame.Rect(self.position, self.size)
     
@@ -95,7 +95,7 @@ class Text(Drawable):
     size = cachedProperty(lambda self: self.font[self.fontSize].size(self.text))
 
 
-    @cachedProperty
+    @cachedProperty[pygame.Rect]
     def body(self) -> pygame.Rect:
         return pygame.Rect(*self.position, *self.size)
     
@@ -277,7 +277,7 @@ class InputBoxDisplay(Drawable):
     def rescale(self, scale: Scale) -> 'InputBoxDisplay':
         return InputBoxDisplay(scale.point(self.position), self.text.rescale(scale.scaleFactor), self.background.rescale(scale.scaleFactor), self.cursorPosition, self.showCursor)
 
-    @cachedProperty
+    @cachedProperty[pygame.Rect]
     def body(self) -> pygame.Rect:
         return self.background.body
     
@@ -348,6 +348,7 @@ class InputBox(Drawable, AutomaticStack):
         stack.enter_context(self._focuser)
 
 
+
 def addPoint(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
     return a[0] + b[0], a[1] + b[1]
 class Group(Drawable, AutomaticStack):
@@ -360,10 +361,14 @@ class Group(Drawable, AutomaticStack):
         else:
             self.orignalPositions = widgetPositions
         if position is not ...:
-            self._widgets: Sequence[Drawable] = [widget.reposition(addPoint(widgetPosition, position)) for widget, widgetPosition in zip(widgets, self.orignalPositions)]
+            self._widgets: Sequence[Drawable] = self._positioner(widgets, self.orignalPositions)
         else:
             self._widgets = widgets
-    
+    @listify
+    def _positioner(self, widgets: Sequence[Drawable], positions: Sequence[Point]) -> Iterable[Drawable]:
+        for widget, position in zip(widgets, positions):
+            yield widget.reposition(addPoint(position, self.position))
+
     def draw(self, window: pygame.Surface, scale: float) -> None:
         for widget in self._widgets:
             widget.draw(window, scale)
@@ -381,13 +386,15 @@ class Group(Drawable, AutomaticStack):
             maxW = max(maxW, rect.width)
         return pygame.Rect(minX, minY, maxW, maxH)
     
-    @cachedProperty
+    @cachedProperty[pygame.Rect]
     def body(self) -> pygame.Rect:
         return self._boundingRect((widget.body for widget in self._widgets))
     
-    @cachedProperty
-    def size(self) -> Size:
+    
+    
+    def get_size(self) -> Size:
         return self.body.width, self.body.height
+    size = cachedProperty[Size](get_size)
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
@@ -395,8 +402,3 @@ class Group(Drawable, AutomaticStack):
             if isinstance(widget, AutomaticStack):
                 stack.enter_context(widget)
 
-
-
-
-
-    

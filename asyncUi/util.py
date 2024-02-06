@@ -1,4 +1,4 @@
-from typing import Union, cast, Generic, TypeVar, TypeVar, overload, Type, Self, TypeVarTuple, Awaitable, Callable, Protocol, Never
+from typing import Any, Iterable, Union, cast, Generic, TypeVar, overload, Self, TypeVarTuple, Awaitable, Callable, Protocol, Never
 from types import EllipsisType
 from functools import wraps
 import asyncio
@@ -12,16 +12,16 @@ class Placeholder(Generic[T]):
     def __init__(self, default: T | None = None, name: str | None = None):
         self.name: str | None = name
         self.default = default
-    def __set_name__(self, owner: Type[T2], name: str) -> None:
+    def __set_name__(self, owner: type[T2], name: str) -> None:
         self.name = "_" + name
         self.attrName = name
     
     @overload
-    def __get__(self, instance: None, owner: Type[T2]) -> Self: ...
+    def __get__(self, instance: None, owner: type[T2]) -> Self: ...
     @overload
-    def __get__(self, instance: T2, owner: Type[T2]) -> T: ...
+    def __get__(self, instance: T2, owner: type[T2]) -> T: ...
 
-    def __get__(self, instance: T2 | None, owner: Type[T2]) -> Self | T:
+    def __get__(self, instance: T2 | None, owner: type[T2]) -> Self | T:
         if instance is None:
             return self
         else:
@@ -134,16 +134,15 @@ class Flag:
     def unset(self) -> None:
         self._state = False
 
-from typing import Any
 Tco = TypeVar('Tco', covariant=True)
 Tcon = TypeVar('Tcon', contravariant=True)
 class ReadableProperty(Protocol[Tco]):
     def __get__(self, instance: Any, owner: type[Any]) -> Tco:
         ...
-    def __set__(self, instance: Any, value: Never) -> Never:
-        ...
-class ReadOnlyProperty(ReadableProperty[Tco]):
-    __set__: Never
-    
-T3 = TypeVar('T3')
 
+
+def listify(function: Callable[[*Ts], Iterable[T]]) -> Callable[[*Ts], list[T]]:
+    @wraps(function)
+    def wrapper(*args: *Ts) -> list[T]:
+        return [value for value in function(*args)]
+    return wrapper

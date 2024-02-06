@@ -1,8 +1,8 @@
 import pygame
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar, Generic, Protocol, Final
-from .util import Placeholder, ReadableProperty, ReadOnlyProperty
+from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar, Generic, Protocol, Final, ClassVar
+from .util import Placeholder
 from .resources import fonts
 from .window import Window
 from contextlib import ExitStack
@@ -43,9 +43,9 @@ class Drawable(ABC):
         ...
 
     position: Placeholder[Point] = Placeholder[Point]((0, 0))
-    size: Placeholder[Size] | cachedProperty[Size]
+    size: cachedProperty[Size] | Placeholder[Size]
 
-    body: cachedProperty[Rect] | Placeholder[Rect] = cachedProperty[Rect](lambda s: Rect(s.position, s.size))
+    body: cachedProperty[Rect] = cachedProperty[Rect](lambda s: Rect(s.position, s.size))
 
 class Scale: 
     def __init__(self, scale: float) -> None:
