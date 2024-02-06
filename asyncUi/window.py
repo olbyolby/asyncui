@@ -385,7 +385,7 @@ class Window(asyncio.AbstractEventLoop):
         self.running = False
         self.debug = __debug__
 
-        self.errorHandler: Callable[['Window', dict[Any, Any]], None] | None = None
+        self.errorHandler: Callable[[asyncio.AbstractEventLoop, dict[str, Any]], object] | None = None
         asyncio._set_running_loop(self)
     
     #Event handler processing
@@ -579,9 +579,13 @@ class Window(asyncio.AbstractEventLoop):
         pass
     def is_closed(self) -> bool:
         return self.closed
+    
+    async def shutdown_asyncgens(self) -> None:
+        warnings.warn("I havn't any idea what t odo on 'shutdown_asyncgens'")
+        pass
 
     # Exception handling
-    def default_exception_handler(self, context: dict[Any, Any]) -> None:
+    def default_exception_handler(self: asyncio.AbstractEventLoop, context: dict[Any, Any]) -> None:
         exception: Exception | None = context.get('exception')
         if exception is not None:
             exceptionInfo = (type(exception), exception, exception.__traceback__)
@@ -596,11 +600,11 @@ class Window(asyncio.AbstractEventLoop):
 
         logger.error('\n'.join(additionalContext), exc_info=exceptionInfo)
 
-    #python is stupid and doesn't think Window is valid, and demands "AbstractEventLoop", dispite Window being a subclass of that.
-    def set_exception_handler(self, handler: Callable[['Window', dict[Any, Any]], None] | None) -> None: #type: ignore[override]
+
+    def set_exception_handler(self, handler: Callable[[asyncio.AbstractEventLoop, dict[str, Any]], object] | None) -> None: 
         self.errorHandler = handler
-    def get_exception_handler(self) -> Callable[['Window', dict[Any, Any]], None] | None: #type: ignore[override]
-        return self.errorHandler
+    def get_exception_handler(self) -> Callable[[asyncio.AbstractEventLoop, dict[str, Any]], object] | None: 
+        return self.errorHandler if self.errorHandler is not None else type(self).default_exception_handler
     def call_exception_handler(self, context: dict[Any, Any]) -> None:
         if self.errorHandler is None:
             self.default_exception_handler(context)
@@ -692,4 +696,10 @@ class Window(asyncio.AbstractEventLoop):
         raise NotImplementedError("pygame event loop does not support creating Unix servers")
     async def connect_accepted_socket(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("pygame event loop does not support connecting accepted sockets")
+    
+    async def sendfile(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support sendfile")
+    async def start_tls(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError("pygame event loop does not support start_tls")
+    
     
