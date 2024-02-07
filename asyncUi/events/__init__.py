@@ -49,7 +49,7 @@ def marshal(event: pygame.event.Event) -> Event | None:
         if name == 'type': #type is a speical case
             continue
 
-        if isinstance(attrType, type) and issubclass(attrType, (Enum, tuple)):
+        if isinstance(attrType, type) and issubclass(attrType, Enum):
             vars(newEvent)[name] = attrType(eventData[name])
         else:
             vars(newEvent)[name] = eventData[name]
