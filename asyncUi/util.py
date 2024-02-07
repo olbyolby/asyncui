@@ -37,7 +37,7 @@ class Placeholder(Generic[T]):
 Inferable = Union[T, EllipsisType]
 
 Ts = TypeVarTuple('Ts')
-Callback = 'Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts | None]'
+CallbackT = 'Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts | None]'
 class EventDispatcher(Generic[*Ts]):
     """
     Provides a "generalization" of callback functions, supporting both asynchronous and synchronous callbacks.

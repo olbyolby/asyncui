@@ -3,7 +3,7 @@ from types import EllipsisType
 import asyncio
 from abc import *
 from asyncUi.window import Window, EventHandler
-from asyncUi.graphics import Group, Box, Text, Clickable, Hoverable, Focusable, InputBoxDisplay, InputBox, ToolBar, centered
+from asyncUi.graphics import SimpleButton, Group, Box, Text, Clickable, Hoverable, Focusable, InputBoxDisplay, InputBox, ToolBar, centered, VirticalMenu
 from asyncUi.display import Color, drawableRenderer, Point, Color
 from asyncUi.resources import fonts
 from asyncUi import events
@@ -20,7 +20,7 @@ exiter.register()
 arial = fonts.fontManager.loadSystemFont('arial')
 
 bar = ToolBar((0,0), [
-    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 1"),
+    SimpleButton(..., Text(..., arial, 16*2, Color(255, 255, 255), "Tool 1"), Box(..., (100, 50), Color(255, 0, 0)), lambda: print("clicked")),
     Text(..., arial, 16*2, Color(255, 255, 255), "Tool 2"),
     Text(..., arial, 16*2, Color(255, 255, 255), "Tool 3"),
     Text(..., arial, 16*2, Color(255, 255, 255), "Tool 4"),
@@ -29,7 +29,14 @@ bar = ToolBar((0,0), [
 box = Box((50, 50), (100, 50), Color(255, 0, 0))
 text = centered(box, Text(..., arial, 16, Color(255, 255, 255), "hello"))
 
-objects = Group((0,0), [box, text, bar])
+menu = VirticalMenu((100,50), [
+    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 1"),
+    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 2"),
+    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 3"),
+    Text(..., arial, 16*2, Color(255, 255, 255), "Tool 4"),
+])
+
+objects = Group((0,0), [box, text, bar, menu]).__enter__()
 
 window.startRenderer(30, drawableRenderer(objects))
 

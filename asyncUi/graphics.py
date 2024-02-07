@@ -347,10 +347,35 @@ class InputBox(Drawable, AutomaticStack):
         stack.enter_context(self._keyDown)
         stack.enter_context(self._focuser)
 
-
-
 def addPoint(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
     return a[0] + b[0], a[1] + b[1]
+class Polygon(Drawable):
+    def __init__(self, position: Inferable[Point], color: Color, points: Sequence[Point]) -> None:
+        self.position = position
+        self.color = color
+        self.points = points
+
+    
+    @renderer
+    def draw(self, window: pygame.Surface, scale: Scale) -> None:
+        pygame.draw.polygon(window, self.color, [scale.point(point) for point in self.absolutePoints])
+
+    @cachedProperty[list[Point]]
+    def absolutePoints(self) -> list[Point]:
+        return [addPoint(self.position, point) for point in self.points]
+    
+    
+    def getSize(self) -> Size:
+        minX, maxX = 0, 0
+        minY, maxY = 0, 0
+        for (x, y) in self.points:
+            minX, maxX = min(minX, x), max(maxX, x)
+            minY, maxY = min(minY, y), max(maxY, y)
+        
+        return (maxX - minX), (maxY - minY)
+    size = cachedProperty[Size](getSize)
+
+
 class Group(Drawable, AutomaticStack):
     
     def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable], widgetPositions: Inferable[Sequence[Point]] = ...) -> None:
@@ -411,8 +436,46 @@ class ToolBar(Group):
             yield widget.reposition((xOffset, self.position[1]))
             xOffset += widget.body.width
 
+
 DrawableT = TypeVar('DrawableT', bound=Drawable)
 def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
     x = outter.position[0] + (outter.size[0] - inner.size[0])//2
     y = outter.position[1] + (outter.size[1] - inner.size[1])//2
     return inner.reposition((x, y))
+
+class VirticalMenu(Group):
+    @listify
+    def _positioner(self, widgets: Sequence[Drawable], positions: Sequence[Point]) -> Iterable[Drawable]:
+        yOffset = self.position[1]
+        for widget in widgets:
+            yield widget.reposition((self.position[0], yOffset))
+            yOffset += widget.body.height
+
+class SimpleButton(Drawable, AutomaticStack):
+    size = Placeholder[Size]()
+    def __init__(self, position: Inferable[Point], text: Text, background: Box | Polygon, onClick: Callable[[], None]) -> None:
+        self.position = position
+        self.background = background.reposition(position)
+        self.text = centered(self.background, text)
+        self.onClick = onClick
+
+        self.size = background.size
+        
+        self._clicker = Clickable(position, self.background.size, self._clickHandle)
+
+    def _clickHandle(self, e: events.MouseButtonUp) -> None:
+        if e.button == events.mouse.Buttons.left:
+            self.onClick()
+        
+
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.background.draw(window, scale)
+        self.text.draw(window, scale)
+
+    @stackEnabler
+    def enable(self, stack: ExitStack) -> None:
+        stack.enter_context(self._clicker)
+
+
+    def reposition(self, position: Inferable[Point]) -> 'SimpleButton':
+        return SimpleButton(position, self.text, self.background, self.onClick)

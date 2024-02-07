@@ -268,3 +268,11 @@ def createGhetto(group: Type[T2]) -> list[T2]:
 
 from typing import no_type_check
 
+
+x = input()
+y: str = "asadf"
+
+if x=="a":
+    print(x+4)
+else:
+    print("dasf")
