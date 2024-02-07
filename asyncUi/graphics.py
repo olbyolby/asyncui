@@ -464,7 +464,7 @@ class SimpleButton(Drawable, AutomaticStack):
         self._clicker = Clickable(position, self.background.size, self._clickHandle)
 
     def _clickHandle(self, e: events.MouseButtonUp) -> None:
-        if e.button == events.mouse.Buttons.left:
+        if e.button == events.mouse.Button.left:
             self.onClick()
         
 

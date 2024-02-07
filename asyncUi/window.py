@@ -525,10 +525,12 @@ class Window(asyncio.AbstractEventLoop):
         This is the event handler that is used to exacute Handles
         """
         event.handle._run()
-    def _handleEvent(self, event: events.Event) -> None:
+    def _handleEvent(self, event: events.Event | None) -> None:
         """
         Execaute every event handler assosated with an event
         """
+        if event is None:
+            return
         if event.type not in self.eventHandlers:
             return 
         for handler in frozenset(self.eventHandlers[event.type]):
@@ -543,12 +545,12 @@ class Window(asyncio.AbstractEventLoop):
 
             #self.callSoon(handler, event)
 
-    def _waitForEvent(self) -> events.Event:
+    def _waitForEvent(self) -> events.Event | None:
         soonestEvent = self.timers.soonest()
         if soonestEvent == float('inf'):
-            return cast(events.Event, pygame.event.wait())
+            return events.marshal(pygame.event.wait())
         else:
-            return cast(events.Event, pygame.event.wait(int(soonestEvent*1000)))
+            return events.marshal(pygame.event.wait(int(soonestEvent*1000)))
     def run(self) -> None:
         logger.info(f'{self!r} begain event loop')
         self.running = True

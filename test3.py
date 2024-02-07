@@ -130,5 +130,64 @@ class Matrix(Generic[T]):
         for row in self.data:
             yield row
         
+from math import sqrt
+from itertools import count
+from typing import Iterable, Iterator
+class Primes:
+    def __init__(self) -> None:
+        self.primes: list[int] = []
+        self._primeGen = self._primeGenerator()
+
+    def _primeGenerator(self) -> Iterator[int]:
+        num = 2
+
+        while True:
+            is_prime = all(num % prime != 0 for prime in self.primes)
+            if is_prime:
+                self.primes.append(num)
+                yield num
+            num += 1
     
+    def isPrime(self, number: int) -> bool:
+        if number in self.primes:
+            return True
+
+        maxPrime = sqrt(number)
+        for trial in self:
+            if trial > maxPrime:
+                return True
+            if number % trial == 0:
+                return False
+        
+        raise AssertionError("Unreachable")
+    __contains__ = isPrime
+            
+    def __iter__(self) -> Iterator[int]:
+        for i in count():
+            yield self[i]
+
+    @overload
+    def __getitem__(self, item: int) -> int: ...
+    @overload
+    def __getitem__(self, item: slice) -> list[int]: ...
+    def __getitem__(self, item: slice | int) -> list[int] | int: 
+        if isinstance(item, int):
+            while item >= len(self.primes):
+                self.primes.append(next(self._primeGen))
+            return self.primes[item]
+        else:
+            return [self[i] for i in range(item.start, item.stop, item.step)]
     
+    def index(self, prime: int) -> int:
+        if prime not in self:
+            raise ValueError(f'{prime} is not a prime number')
+
+        if prime in self.primes:
+            return self.primes.index(prime)
+        for i, currentPrime in enumerate(self, len(self.primes)):
+            if currentPrime == prime:
+                return i   
+    
+        raise AssertionError("Unreachable")
+    
+primes = Primes()
