@@ -375,6 +375,22 @@ class Polygon(Drawable):
         return (maxX - minX), (maxY - minY)
     size = cachedProperty[Size](getSize)
 
+    def reposition(self, position: Point | EllipsisType) -> 'Polygon':
+        return Polygon(position, self.color, self.points)
+
+class Line(Drawable):
+    def __init__(self, position: Inferable[Point], color: Color, thickness: int, start: Point, end: Point) -> None:
+        self.position = position
+        self.color = color
+        self.start = start
+        self.end = end
+        self.thickness = thickness
+    @renderer
+    def draw(self, window: pygame.Surface, scale: Scale) -> None:
+        pygame.draw.line(window, self.color, scale.point(addPoint(self.start, self.position)), scale.point(addPoint(self.end, self.position)), int(self.thickness*scale.scaleFactor))
+
+    def reposition(self, position: Inferable[Point]) -> 'Line':
+        return Line(position, self.color, self.thickness, self.start, self.end)
 
 class Group(Drawable, AutomaticStack):
     
@@ -479,3 +495,17 @@ class SimpleButton(Drawable, AutomaticStack):
 
     def reposition(self, position: Inferable[Point]) -> 'SimpleButton':
         return SimpleButton(position, self.text, self.background, self.onClick)
+    
+class Circle(Drawable):
+    def __init__(self, position: Inferable[Point], color: Color, radius: int, thickness: int = 0) -> None:
+        self.position = position
+        self.color = color
+        self.radius = radius
+        self.thickness = thickness
+    
+    @renderer
+    def draw(self, window: pygame.Surface, scale: Scale) -> None:
+        pygame.draw.circle(window, self.color, scale.point(addPoint(self.position, (self.radius, self.radius))), self.radius*scale.scaleFactor, int(self.thickness*scale.scaleFactor))
+
+    def reposition(self, position: Point | EllipsisType) -> Circle:
+        return Circle(self.position, self.color, self.radius, self.thickness)

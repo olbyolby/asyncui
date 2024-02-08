@@ -6,6 +6,10 @@ class Button(Enum):
     left = pygame.BUTTON_LEFT
     right = pygame.BUTTON_RIGHT
     middle = pygame.BUTTON_MIDDLE
+    x1 = pygame.BUTTON_X1
+    x2 = pygame.BUTTON_X2
+    scrollWheelDown = pygame.BUTTON_WHEELDOWN
+    scroolWheelUp = pygame.BUTTON_WHEELUP
 class Buttons:
     def __init__(self, buttons: tuple[int, int, int]):
         self.buttons = buttons
