@@ -4,45 +4,45 @@ from typing import Callable
 from enum import Enum
 
 class FontSizeManager:
-    def __init__(self, fontName: str, fontLoader: Callable[[str, int], pygame.font.Font]) -> None:
-        self.fontLoader = fontLoader
-        self.fontName = fontName
-        self.loadedFonts = dict[int, pygame.font.Font]()
+    def __init__(self, font_name: str, font_loader: Callable[[str, int], pygame.font.Font]) -> None:
+        self.font_loader = font_loader
+        self.font_name = font_name
+        self.loaded_fonts = dict[int, pygame.font.Font]()
     def withSize(self, fontSize: int) -> pygame.font.Font:
-        if fontSize in self.loadedFonts:
-            return self.loadedFonts[fontSize]
+        if fontSize in self.loaded_fonts:
+            return self.loaded_fonts[fontSize]
         
-        newFont = self.fontLoader(self.fontName, fontSize)
-        self.loadedFonts[fontSize] = newFont
+        newFont = self.font_loader(self.font_name, fontSize)
+        self.loaded_fonts[fontSize] = newFont
         return newFont
     def __getitem__(self, key: int) -> pygame.font.Font:
         return self.withSize(key)
     def __delitem__(self, key: int) -> None:
-        del self.loadedFonts[key]
+        del self.loaded_fonts[key]
 
 
         
 class FontManager:
-    def __init__(self, defaultLoader: Callable[[str, int], pygame.font.Font] = pygame.font.SysFont) -> None:
-        self.defaultLoader = defaultLoader
-        self.loadedFonts = dict[str, FontSizeManager]()
+    def __init__(self, default_loader: Callable[[str, int], pygame.font.Font] = pygame.font.SysFont) -> None:
+        self.default_loader = default_loader
+        self.loaded_fonts = dict[str, FontSizeManager]()
 
-    def loadLocalFont(self, fontName: str) -> FontSizeManager: 
-        if fontName not in self.loadedFonts:
-            self.loadedFonts[fontName] = FontSizeManager(fontName, pygame.font.Font)
-        return self.loadedFonts[fontName]
+    def loadLocalFont(self, font_name: str) -> FontSizeManager: 
+        if font_name not in self.loaded_fonts:
+            self.loaded_fonts[font_name] = FontSizeManager(font_name, pygame.font.Font)
+        return self.loaded_fonts[font_name]
         
     def loadSystemFont(self, fontName: str) -> FontSizeManager:
-        if fontName not in self.loadedFonts:
-            self.loadedFonts[fontName] = FontSizeManager(fontName, pygame.font.SysFont)
-        return self.loadedFonts[fontName]
+        if fontName not in self.loaded_fonts:
+            self.loaded_fonts[fontName] = FontSizeManager(fontName, pygame.font.SysFont)
+        return self.loaded_fonts[fontName]
     
     def __getitem__(self, fontName: str) -> FontSizeManager:
-        if fontName not in self.loadedFonts:
-            self.loadedFonts[fontName] = FontSizeManager(fontName, self.defaultLoader)
-        return self.loadedFonts[fontName]
+        if fontName not in self.loaded_fonts:
+            self.loaded_fonts[fontName] = FontSizeManager(fontName, self.default_loader)
+        return self.loaded_fonts[fontName]
     def __delitem__(self, fontName: str) -> None:
-        del self.loadedFonts[fontName]
+        del self.loaded_fonts[fontName]
 fontManager = FontManager(pygame.font.Font)
 
 Font = FontSizeManager

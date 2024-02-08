@@ -372,11 +372,11 @@ class Window(asyncio.AbstractEventLoop):
         pygame.display.set_caption(title)
         self.size = window.get_size()
         self.window = window
-        self.eventHandlers: dict[int, set[Callable[[Any], None]]] = {}
+        self.event_handlers: dict[int, set[Callable[[Any], None]]] = {}
         self.timers = TimerList()
-        self.orginalSize = window.get_size()
+        self.orginal_size = window.get_size()
         self.renderer: Renderer | None = None
-        self.defaultExecutor: Executor = ThreadPoolExecutor(5)
+        self.default_executor: Executor = ThreadPoolExecutor(5)
 
         self.registerEventHandler(ExecuteCallbackEvent, self._run_exacute_callback)
         self.registerEventHandler(events.VideoResize, self._resizeHandler)
@@ -397,27 +397,27 @@ class Window(asyncio.AbstractEventLoop):
         
         The event handler will be executed next time the given event is received
         """
-        if eventType.type not in self.eventHandlers:
-            self.eventHandlers[eventType.type] = set()
+        if eventType.type not in self.event_handlers:
+            self.event_handlers[eventType.type] = set()
 
-        self.eventHandlers[eventType.type].add(handler)
+        self.event_handlers[eventType.type].add(handler)
     def unregisterEventHandler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
         logger.debug(f"Unregistered event handler {handler!r} for event type {eventType.__qualname__}")
         """
         unregister an event handler for a given event type,
         raises a ValueError if the event handler is not registered
         """
-        if eventType.type not in self.eventHandlers:
+        if eventType.type not in self.event_handlers:
             raise ValueError("No event handlers of {evnetType!r} are registered") 
-        if handler not in self.eventHandlers[eventType.type]:
+        if handler not in self.event_handlers[eventType.type]:
             raise ValueError(f"Event handler {handler!r} is not registered")
         
-        self.eventHandlers[eventType.type].remove(handler)
+        self.event_handlers[eventType.type].remove(handler)
     def isEventHandlerRegistered(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> bool:
         """
         Return whether or not an event handler is registered
         """
-        return eventType.type in self.eventHandlers and handler in self.eventHandlers[eventType.type]
+        return eventType.type in self.event_handlers and handler in self.event_handlers[eventType.type]
     def postEvent(self, event: EventT | pygame.event.Event) -> None:
         """
         Post ether an asyncUi event or an pygame event to the event queue
@@ -440,7 +440,7 @@ class Window(asyncio.AbstractEventLoop):
 
     # Renderering
     def _resizeHandler(self, event: events.VideoResize) -> None:
-        newHeight = event.w * (self.orginalSize[1] / self.orginalSize[0])
+        newHeight = event.w * (self.orginal_size[1] / self.orginal_size[0])
         pygame.display.set_mode((event.w, newHeight), self.window.get_flags())
 
     @property
@@ -448,7 +448,7 @@ class Window(asyncio.AbstractEventLoop):
         """
         Returns the scale factor between the inital window size and it's current size
         """
-        return self.window.get_size()[0]/self.orginalSize[0]
+        return self.window.get_size()[0]/self.orginal_size[0]
 
     def startRenderer(self, fps: int, renderer: Callable[['Window'], None]) -> Renderer:
         """
@@ -492,15 +492,15 @@ class Window(asyncio.AbstractEventLoop):
     # Exceutors
     def runInExecutor(self, executor: Executor | None, function: Callable[[*Ts], T], *args: *Ts) -> asyncio.Future[T]:
         if executor is None:
-            executor = self.defaultExecutor
+            executor = self.default_executor
         return asyncio.wrap_future(executor.submit(function, *args))
     run_in_executor = cast(Any, runInExecutor)
     def set_default_executor(self, executor: Executor) -> None:
-        self.defaultExecutor.shutdown(cancel_futures=True)
-        self.defaultExecutor = executor
+        self.default_executor.shutdown(cancel_futures=True)
+        self.default_executor = executor
     async def shutdown_default_executor(self, timeout: int | None = None) -> None:
         assert timeout == None, "timeout not supported in shutdown executor"
-        self.defaultExecutor.shutdown(cancel_futures=True)
+        self.default_executor.shutdown(cancel_futures=True)
 
     #Factories 
     def create_future(self) -> asyncio.Future[Any]:
@@ -531,9 +531,9 @@ class Window(asyncio.AbstractEventLoop):
         """
         if event is None:
             return
-        if event.type not in self.eventHandlers:
+        if event.type not in self.event_handlers:
             return 
-        for handler in frozenset(self.eventHandlers[event.type]):
+        for handler in frozenset(self.event_handlers[event.type]):
             try:
                 handler(event)
             except Exception as e:

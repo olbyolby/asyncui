@@ -50,16 +50,16 @@ class Image(Drawable):
 
         # Scaling images so slow, so cache it and update the cache when the scale is changed
         # This prevents rescaling each frame, which is slow
-        self._cachedSurface = surface
-        self._cachedScale: float = 1
+        self._cached_surface = surface
+        self._cached_scale: float = 1
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        if self._cachedScale != scale.scaleFactor:
-            self._cachedSurface = pygame.transform.scale_by(self.surface, scale.scaleFactor)
-            self._cachedScale = scale.scaleFactor
+        if self._cached_scale != scale.scale_factor:
+            self._cached_surface = pygame.transform.scale_by(self.surface, scale.scale_factor)
+            self._cached_scale = scale.scale_factor
         
-        window.blit(self._cachedSurface, scale.point(self.position))
+        window.blit(self._cached_surface, scale.point(self.position))
 
     def reposition(self, position: Inferable[Point]) -> 'Image':
         return Image(position, self.surface, self.size)
@@ -87,8 +87,8 @@ class Text(Drawable):
         # Dirty, evil, mutable state
         # This exits for speed, rendering the text each frame is slow, we cache it
         # Then, if the scale changes, rerender the text only then
-        self._cachedScale = 1.
-        self._cachedText: pygame.Surface | None = None
+        self._cached_scale = 1.
+        self._cached_text: pygame.Surface | None = None
 
     
     
@@ -109,11 +109,11 @@ class Text(Drawable):
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
         #Check if the scale has changed, if yes, rerender the text
-        if self._cachedText is None or self._cachedScale != scale.scaleFactor:
-            self._cachedScale = scale.scaleFactor
-            self._cachedText = self.font[scale.fontSize(self.fontSize)].render(self.text, True, self.color)
+        if self._cached_text is None or self._cached_scale != scale.scale_factor:
+            self._cached_scale = scale.scale_factor
+            self._cached_text = self.font[scale.fontSize(self.fontSize)].render(self.text, True, self.color)
         
-        window.blit(self._cachedText, scale.point(self.position))
+        window.blit(self._cached_text, scale.point(self.position))
 
     def reposition(self, position: Inferable[Point]) -> 'Text':
         return Text(position, self.font, self.fontSize, self.color, self.text)
@@ -132,7 +132,7 @@ class Clickable(AutomaticStack):
     def __init__(self, position: Inferable[Point], size: Size, onClick: Callable[[events.MouseButtonUp], None]) -> None:
         self.position = position
         self.size = size
-        self.onClick = onClick
+        self.on_click = onClick
     
         self.debounce = False
         self._stack = ExitStack()
@@ -152,7 +152,7 @@ class Clickable(AutomaticStack):
         if self.debounce is True:
             self.debounce = False
             if scale.rect(self.area).collidepoint(event.pos):
-                self.onClick(event)
+                self.on_click(event)
 
     def enable(self) -> None:
         with ExitStack() as stack:
@@ -162,11 +162,11 @@ class Clickable(AutomaticStack):
 
 class Hoverable(AutomaticStack): 
     position = Placeholder[Point]()
-    def __init__(self, position: Inferable[Point], size: Size, startHover: Callable[[events.MouseMove], None] | None, endHover: Callable[[events.MouseMove], None] | None) -> None:
+    def __init__(self, position: Inferable[Point], size: Size, start_hover: Callable[[events.MouseMove], None] | None, end_hover: Callable[[events.MouseMove], None] | None) -> None:
         self.position = position
         self.size = size
-        self.startHover = startHover
-        self.endHover = endHover
+        self.start_hover = start_hover
+        self.end_hover = end_hover
 
         self._hovered = False
     @cachedProperty
@@ -178,12 +178,12 @@ class Hoverable(AutomaticStack):
         scale = Scale(Window().scaleFactor)
         if self._hovered is False and scale.rect(self.area).collidepoint(event.pos):
             self._hovered = True
-            if self.startHover is not None:
-                self.startHover(event)
+            if self.start_hover is not None:
+                self.start_hover(event)
         elif self._hovered is True and not scale.rect(self.area).collidepoint(event.pos):
             self._hovered = False
-            if self.endHover is not None:
-                self.endHover(event)
+            if self.end_hover is not None:
+                self.end_hover(event)
 
     def enable(self) -> None:
         with ExitStack() as stack:
@@ -193,11 +193,11 @@ class Hoverable(AutomaticStack):
 
 class Focusable(AutomaticStack):
     position = Placeholder[Point]()
-    def __init__(self, position: Inferable[Point], size: Size, onFocus: Callable[[], None], onUnfocus: Callable[[], None]) -> None:
+    def __init__(self, position: Inferable[Point], size: Size, on_focus: Callable[[], None], on_unfocus: Callable[[], None]) -> None:
         self.position = position
         self.size = size
-        self.onFocus = onFocus
-        self.onUnfocus = onUnfocus
+        self.onFocus = on_focus
+        self.onUnfocus = on_unfocus
     
         self._selected = False
 
@@ -245,10 +245,10 @@ class InputBoxDisplay(Drawable):
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
         with Clip(window, scale.rect(self.background.body)):
-            self.background.draw(window, scale.scaleFactor)
-            self.text.draw(window, scale.scaleFactor)
+            self.background.draw(window, scale.scale_factor)
+            self.text.draw(window, scale.scale_factor)
             if self.showCursor:
-                self.cursorBox.draw(window, scale.scaleFactor)
+                self.cursorBox.draw(window, scale.scale_factor)
     
     def reposition(self, position: Point | EllipsisType) -> 'InputBoxDisplay':
         return InputBoxDisplay(position, self.text, self.background, self.cursorPosition, self.showCursor)
@@ -275,7 +275,7 @@ class InputBoxDisplay(Drawable):
     
     @rescaler
     def rescale(self, scale: Scale) -> 'InputBoxDisplay':
-        return InputBoxDisplay(scale.point(self.position), self.text.rescale(scale.scaleFactor), self.background.rescale(scale.scaleFactor), self.cursorPosition, self.showCursor)
+        return InputBoxDisplay(scale.point(self.position), self.text.rescale(scale.scale_factor), self.background.rescale(scale.scale_factor), self.cursorPosition, self.showCursor)
 
     @cachedProperty[pygame.Rect]
     def body(self) -> pygame.Rect:
@@ -387,7 +387,7 @@ class Line(Drawable):
         self.thickness = thickness
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.line(window, self.color, scale.point(addPoint(self.start, self.position)), scale.point(addPoint(self.end, self.position)), int(self.thickness*scale.scaleFactor))
+        pygame.draw.line(window, self.color, scale.point(addPoint(self.start, self.position)), scale.point(addPoint(self.end, self.position)), int(self.thickness*scale.scale_factor))
 
     def reposition(self, position: Inferable[Point]) -> 'Line':
         return Line(position, self.color, self.thickness, self.start, self.end)
@@ -398,11 +398,11 @@ class Group(Drawable, AutomaticStack):
         self.position = position
   
         if widgetPositions is ...:
-            self.orignalPositions: Sequence[Point] = [widget.position for widget in widgets]
+            self.orignal_positions: Sequence[Point] = [widget.position for widget in widgets]
         else:
-            self.orignalPositions = widgetPositions
+            self.orignal_positions = widgetPositions
         if position is not ...:
-            self._widgets: Sequence[Drawable] = self._positioner(widgets, self.orignalPositions)
+            self._widgets: Sequence[Drawable] = self._positioner(widgets, self.orignal_positions)
         else:
             self._widgets = widgets
     @listify
@@ -416,7 +416,7 @@ class Group(Drawable, AutomaticStack):
             widget.draw(window, scale)
     
     def reposition(self, position: Point | EllipsisType) -> Self:
-        return type(self)(position, self._widgets, self.orignalPositions)
+        return type(self)(position, self._widgets, self.orignal_positions)
     
     @staticmethod
     def _boundingRect(rects: Iterable[pygame.Rect]) -> pygame.Rect:
@@ -505,7 +505,7 @@ class Circle(Drawable):
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.circle(window, self.color, scale.point(addPoint(self.position, (self.radius, self.radius))), self.radius*scale.scaleFactor, int(self.thickness*scale.scaleFactor))
+        pygame.draw.circle(window, self.color, scale.point(addPoint(self.position, (self.radius, self.radius))), self.radius*scale.scale_factor, int(self.thickness*scale.scale_factor))
 
     def reposition(self, position: Point | EllipsisType) -> Circle:
         return Circle(self.position, self.color, self.radius, self.thickness)

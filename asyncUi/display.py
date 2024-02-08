@@ -49,15 +49,15 @@ class Drawable(ABC):
 
 class Scale: 
     def __init__(self, scale: float) -> None:
-        self.scaleFactor = scale
+        self.scale_factor = scale
     def rect(self, rect: pygame.Rect) -> pygame.Rect:
         return pygame.Rect(*self.point((rect.x, rect.y)), *self.size((rect.width, rect.height)))
     def point(self, point: Point) -> Point:
-        return (int(point[0] * self.scaleFactor), int(point[1] * self.scaleFactor))
+        return (int(point[0] * self.scale_factor), int(point[1] * self.scale_factor))
     def size(self, size: Size) -> Size:
         return self.point(size)
     def fontSize(self, size: int) -> int:
-        return int(self.scaleFactor * size)
+        return int(self.scale_factor * size)
     def polygon(self, polygon: Iterable[Point]) -> list[Point]:
         return [self.point(point) for point in polygon]
 
