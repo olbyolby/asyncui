@@ -191,3 +191,4 @@ class Primes:
         raise AssertionError("Unreachable")
     
 primes = Primes()
+

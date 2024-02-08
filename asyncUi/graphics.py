@@ -32,7 +32,7 @@ class Box(Drawable):
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.rect(window, self.color, scale.rect(self.body), self.thinkness)       
+        pygame.draw.rect(window, self.color, scale.rect(self.body), scale.length(self.thinkness))     
 
     def reposition(self, position: Inferable[Point]) -> 'Box':
         return Box(position, self.size, self.color)   

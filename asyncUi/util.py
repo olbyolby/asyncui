@@ -1,5 +1,5 @@
 from typing import Any, Iterable, Union, cast, Generic, TypeVar, overload, Self, TypeVarTuple, Awaitable, Callable, Protocol, Never
-from types import EllipsisType
+from types import EllipsisType, TracebackType
 from functools import wraps
 import asyncio
 
@@ -146,3 +146,35 @@ def listify(function: Callable[[*Ts], Iterable[T]]) -> Callable[[*Ts], list[T]]:
     def wrapper(*args: *Ts) -> list[T]:
         return [value for value in function(*args)]
     return wrapper
+
+
+class ContextHandler(Protocol):
+    def __enter__(self) -> Self:
+        ...
+    def __exit__(self, excType: type[BaseException] | None, excValue: BaseException | None, traceback: TracebackType | None, /) -> None:
+        ...
+ContextT = TypeVar('ContextT', bound=ContextHandler)
+
+class MutableContextManager(Generic[ContextT]):
+    def __init__(self, value: ContextT | None = None) -> None:
+        self.context = value
+    def changeContext(self, value: ContextT) -> None:
+        if self.context is not None:
+            self.context.__exit__(None, None, None)
+        self.context = value.__enter__()
+    def getContext(self) -> ContextT:
+        if self.context is None:
+            raise ValueError("Context is None")
+        return self.context
+    
+    def clear(self) -> None:
+        if self.context is not None:
+            self.context.__exit__(None, None, None)
+            self.context = None
+    
+    def __enter__(self) -> Self:
+        return self
+    def __exit__(self, exception: type[BaseException] | None, exceptionType: BaseException | None, traceback: TracebackType | None) -> None:
+        if self.context is not None:
+            self.context.__exit__(None, None, None)
+            self.context = None

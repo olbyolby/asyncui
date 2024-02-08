@@ -60,6 +60,8 @@ class Scale:
         return int(self.scale_factor * size)
     def polygon(self, polygon: Iterable[Point]) -> list[Point]:
         return [self.point(point) for point in polygon]
+    def length(self, length: int) -> int:
+        return int(length*self.scale_factor)
 
 
 class AutomaticStack:

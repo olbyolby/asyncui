@@ -107,7 +107,7 @@ def eventHandler(event_type: Type[EventT] | Callable[[EventT], None]) -> Callabl
     else:
         event_handler = event_type
         #infer the event type based on the type hint
-        signature = inspect.signature(function)
+        signature = inspect.signature(event_handler)
             
         arguments = list(signature.parameters.values())
         if len(arguments) != 1:

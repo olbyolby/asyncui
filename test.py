@@ -2,10 +2,11 @@ from typing import Never, no_type_check,TypeVarTuple, overload, LiteralString, C
 from types import EllipsisType
 import asyncio
 from abc import *
-from asyncUi.window import Window, EventHandler
+from asyncUi.window import Window, eventHandler
 from asyncUi.graphics import Line, Polygon, Circle, SimpleButton, Group, Box, Text, Clickable, Hoverable, Focusable, InputBoxDisplay, InputBox, ToolBar, centered, VirticalMenu
 from asyncUi.display import Size, stackEnabler, AutomaticStack, Drawable, Color, drawableRenderer, Point, Color
 from asyncUi.resources import fonts
+from asyncUi.util import MutableContextManager
 from asyncUi import events
 from math import sin, cos, radians
 from contextlib import ExitStack
@@ -15,7 +16,7 @@ pygame.init()
 
 window = Window(pygame.display.set_mode((250, 250), pygame.RESIZABLE), "test")
 
-@EventHandler
+@eventHandler
 def exiter(event: events.Quit) -> Never:
     exit()
 exiter.register()
@@ -58,6 +59,8 @@ class Clock(Drawable, AutomaticStack):
         self.timeBox = Box((0, 0), scaleSize(self.digitalTime.size, 1.125), Color(255, 255, 255))
         self.digitalTime = centered(self.timeBox, self.digitalTime)
 
+
+
         asyncio.ensure_future(self.timeUpdater())
     def draw(self, window: pygame.Surface, scale: float) -> None:
         self.clockCircle.draw(window, scale)
@@ -76,7 +79,7 @@ class Clock(Drawable, AutomaticStack):
         self.timeBox.draw(window, scale)
         self.digitalTime.draw(window, scale)
     
-
+        
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
         pass
@@ -94,7 +97,15 @@ class Clock(Drawable, AutomaticStack):
             self.digitalTime = self.digitalTime.changeText(f'{now.hour}:{now.minute}:{now.second}')
             await asyncio.sleep(1)
 
-window.startRenderer(30, drawableRenderer(Clock().__enter__()))
 
+async def playAlarm(period: int) -> None:   
+    while True:
+        for i in range(period):
+            print("ALARM")
+        await asyncio.sleep(1)             
+
+
+
+window.startRenderer(30, drawableRenderer(Clock().__enter__()))
 
 window.run()

@@ -1,4 +1,4 @@
-from typing import Any, Type, Callable, Protocol, Literal, Generic, TypeVar, Annotated
+from typing import Any, Type, Callable, Protocol, Literal, Generic, TypeVar, Annotated, Self
 from . import keyboard, mouse
 from inspect import get_annotations as getAnnotations
 from dataclasses import dataclass
@@ -7,55 +7,71 @@ import pygame
 
 
 eventTypes: dict[int, type['Event']] = {}
-class EventTypeMeta(type):
-    type: int
-    def __init__(self, name: str, bases: tuple['EventTypeMeta', ...], attrs: dict[str, object]):
-        if 'type' not in attrs:
-            self.type = pygame.event.custom_type()
-        if not isinstance(self.type, int):
-            raise RuntimeError(f'Event type {name} has an invalid ".type" attribute(it must be an integer)') 
-        eventTypes[self.type] = self #type: ignore
 
-        super().__init__(name, bases, attrs)
-
-    def __instancecheck__(self, instance: object) -> bool:
-        if isinstance(instance, pygame.event.Event) and (instance.type == self.type or self is Event):
-            return True
-            
-        return super().__instancecheck__(instance)
-
-
-
-
-class Event(metaclass = EventTypeMeta):
+class Event:
     type: int = -1
-    _orginEvent: pygame.event.Event | None = None
+    _orgin_event: pygame.event.Event | None = None
+
+
+    def _marshal(newEvent: Self, event: pygame.event.Event, /) -> Self:
+        """
+        Base implementation of the event type marshaler
+
+        Reads through the type's annotation's and finds all enumerations,
+        it then converts the corasponding event value into the enum, and returns
+        a new instance with converted enums
+
+        Subclasses which require custom type marshaling should override this method,
+        newEvent will be provided using cls.__new__(cls), and should be initialized with
+        data by this function, the 2nd argument, `event`, contains the event being constructed from.
+        """
+
+        eventData = vars(event)
+        eventAnnotations: dict[str, type | object] = getAnnotations(type(newEvent))
+        for name, attrType in eventAnnotations.items():
+            if name == 'type': #type is a speical case
+                continue
+
+            if isinstance(attrType, type) and issubclass(attrType, Enum):
+                vars(newEvent)[name] = attrType(eventData[name])
+            else:
+                vars(newEvent)[name] = eventData[name]
+        newEvent._orgin_event = event
+
+        return newEvent
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        if not hasattr(cls, 'type') or cls.type == -1:
+            cls.type = pygame.event.custom_type()
+        if not isinstance(cls.type, int):
+            raise RuntimeError(f'Event type {cls.__name__} has an invalid ".type" attribute(it must be an integer)') 
+        
+        eventTypes[cls.type] = cls
+        super().__init_subclass__(**kwargs)
+    def _get_pygame_event(self) -> pygame.event.Event:
+        """
+        Return a pygame event reperesenting can event object.
+
+        If self._orgin_event is set, returns that, if not, it
+        copys the event's `vars` into a pygame event and uses `self.type` as the type
+        You probably don't want to override this, but you can if custom pygame event creation is needed.
+        """
+        if self._orgin_event is not None:
+            return self._orgin_event
+        else:
+            return pygame.event.Event(self.type, vars(self))
+
 
 def toPygameEvent(event: Event | pygame.event.Event) -> pygame.event.Event:
     if isinstance(event, pygame.event.Event):
         return event
-    return pygame.event.Event(event.type, vars(event))
+    return event._get_pygame_event()
 
 def marshal(event: pygame.event.Event) -> Event | None:
     if event.type not in eventTypes:
         return None
     eventType = eventTypes[event.type]
 
-    newEvent = eventType.__new__(eventType)
-
-    eventData = vars(event)
-    eventAnnotations: dict[str, type | object] = getAnnotations(eventType)
-    for name, attrType in eventAnnotations.items():
-        if name == 'type': #type is a speical case
-            continue
-
-        if isinstance(attrType, type) and issubclass(attrType, Enum):
-            vars(newEvent)[name] = attrType(eventData[name])
-        else:
-            vars(newEvent)[name] = eventData[name]
-    newEvent._orginEvent = event
-
-    return newEvent
+    return eventType._marshal(eventType.__new__(eventType), event)
 
 class KeyDown(Event):
     type: int = pygame.KEYDOWN
