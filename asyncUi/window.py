@@ -56,37 +56,18 @@ class EventHandler(Generic[EventT]):
         registered - checks if the event handler is currently registered
 
     """
-    def __init__(self, function: Callable[[EventT], None], eventType: Type[EventT] | None = None):
+    def __init__(self, function: Callable[[EventT], None], event_type: Type[EventT]):
         self.function = function
-        if eventType is not None:
-            self.eventType = eventType
-        else:
-            #infer the event type based on the type hint
-            signature = inspect.signature(function)
-            
-            arguments = list(signature.parameters.values())
-            if len(arguments) != 1:
-                raise ValueError("Event handler must take one parameter")
-            
-            eventArgument = arguments[0]
-            if eventArgument.annotation is eventArgument.empty:
-                raise ValueError("Event handler must have a type annotation if a type is not specified explicitly")
-            eventType = eventArgument.annotation
-            if not isinstance(eventType, type):
-                raise ValueError("Event handler's event annotation must be a valid type")
-            if not issubclass(eventType, events.Event):
-                raise ValueError("Event handler's evnet annotation must be a subclass of events.Event")
-
-            self.eventType = eventType
+        self.event_type = event_type
     def register(self) -> None:
         if self.registered: return
-        Window().registerEventHandler(self.eventType, self.function)
+        Window().registerEventHandler(self.event_type, self.function)
     def unregister(self) -> None:
         if not self.registered: return
-        Window().unregisterEventHandler(self.eventType, self.function)
+        Window().unregisterEventHandler(self.event_type, self.function)
     @property
     def registered(self) -> bool:
-        return Window().isEventHandlerRegistered(self.eventType, self.function)    
+        return Window().isEventHandlerRegistered(self.event_type, self.function)    
     
     def __enter__(self) -> Self:
         self.register()
@@ -96,11 +77,11 @@ class EventHandler(Generic[EventT]):
         self.unregister()
 
 @overload
-def eventHandler(eventType: Type[EventT], /) -> Callable[[Callable[[EventT], None]], EventHandler[EventT]]: ...
+def eventHandler(event_type: Type[EventT], /) -> Callable[[Callable[[EventT], None]], EventHandler[EventT]]: ...
 @overload
-def eventHandler(eventHandler: Callable[[EventT], None], /) -> EventHandler[EventT]: ...
+def eventHandler(event_handler: Callable[[EventT], None], /) -> EventHandler[EventT]: ...
 
-def eventHandler(eventType: Type[EventT] | Callable[[EventT], None]) -> Callable[[Callable[[EventT], None]], EventHandler[EventT]] | EventHandler[EventT]: 
+def eventHandler(event_type: Type[EventT] | Callable[[EventT], None]) -> Callable[[Callable[[EventT], None]], EventHandler[EventT]] | EventHandler[EventT]: 
     """
     An alternative constructor to `EventHandler`, supports use as a function decorator without type hints or with type hints,
     It is preferred over `EventHandler` directly.
@@ -118,13 +99,29 @@ def eventHandler(eventType: Type[EventT] | Callable[[EventT], None]) -> Callable
         def printKey(event):
             print(event.unicode)
     """
-    if isinstance(eventType, type) and issubclass(eventType, events.Event):
-        @functools.wraps(eventType)
+    if isinstance(event_type, type) and issubclass(event_type, events.Event):
+        @functools.wraps(event_type)
         def _inner(func: Callable[[EventT], None]) -> EventHandler[EventT]:
-            return EventHandler(func, eventType)
+            return EventHandler(func, event_type) #type: ignore
         return _inner
     else:
-        return EventHandler(eventType)
+        event_handler = event_type
+        #infer the event type based on the type hint
+        signature = inspect.signature(function)
+            
+        arguments = list(signature.parameters.values())
+        if len(arguments) != 1:
+            raise ValueError("Event handler must take one parameter")
+        
+        event_argument = arguments[0]
+        if event_argument.annotation is event_argument.empty:
+            raise ValueError("Event handler must have a type annotation if a type is not specified explicitly")
+        event_type = event_argument.annotation
+        if not isinstance(event_type, type):
+            raise ValueError("Event handler's event annotation must be a valid type")
+        if not issubclass(event_type, events.Event):
+            raise ValueError("Event handler's evnet annotation must be a subclass of events.Event")
+        return EventHandler(event_handler, event_type)
 
 class MethodEventHandler(Generic[T, EventT]):
     """
@@ -157,12 +154,12 @@ class MethodEventHandler(Generic[T, EventT]):
         return handler  
     
 @overload
-def eventHandlerMethod(eventType: Type[EventT], /) -> Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:  ...
+def eventHandlerMethod(event_type: Type[EventT], /) -> Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:  ...
 
 @overload
 def eventHandlerMethod(handler: Callable[[T, EventT], None], /) -> MethodEventHandler[T, EventT]: ...
 
-def eventHandlerMethod(handlerOrType: Type[EventT] | Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT] | Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:
+def eventHandlerMethod(handler_or_type: Type[EventT] | Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT] | Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:
     """
     Create an event handler from a class method
 
@@ -196,15 +193,15 @@ def eventHandlerMethod(handlerOrType: Type[EventT] | Callable[[T, EventT], None]
         # Notice how `self` is also passed as an argument
     """
     
-    if isinstance(handlerOrType, type):
+    if isinstance(handler_or_type, type):
         #if an event type is given explicitly, return a new decorator to create the method handler
-        eventType = handlerOrType
+        eventType = handler_or_type
         def _inner(handler:Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT]:
             return MethodEventHandler(handler, eventType)
         return _inner
     else:
         #if no event type is speificed, infer it from the function's type hint
-        handler = handlerOrType
+        handler = handler_or_type
 
         if not inspect.isfunction(handler):
             raise ValueError("A event handler method must be a python function for event type inference(Callable objects are not allowed)")
