@@ -407,6 +407,9 @@ class Line(Drawable):
 
     def reposition(self, position: Inferable[Point]) -> 'Line':
         return Line(position, self.color, self.thickness, self.start, self.end)
+    
+    def changePoint(self, start: Inferable[Point], end: Inferable[Point]) -> Line:
+        return Line(self.position, self.color, self.thickness, self.start if start is ... else start, self.end if end is ... else end)
 
 class Group(Drawable, AutomaticStack):
     
