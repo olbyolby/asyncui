@@ -553,3 +553,34 @@ class Button(Drawable, AutomaticStack):
 
     def reposition(self, position: Point | EllipsisType) -> 'Button':
         return Button(position, self.widget, self.on_click)
+    
+class MenuWindow(Drawable, AutomaticStack):
+    size = Placeholder[Size]()
+    def __init__(self, position: Inferable[Point], size: Size, color: Color, title: Text, close: Callable[[], None], inside: Drawable) -> None:
+        self.position = position
+        self.size = size
+
+        self.background = Box(position, size, color)
+        self.title = title.reposition(position)
+        self.screen = inside.reposition(... if position is ... else addPoint(position, (0,self.title.height)))
+        self.close = close
+    
+    @cachedProperty
+    def exitButton(self) -> Button:
+        size = self.size
+        return Button(addPoint(self.position, (size[0]-size[0]//8, 0)), Box(..., (size[0]//8, self.title.height), Color(255, 0, 0)), self.close)
+   
+    @stackEnabler
+    def enable(self, stack: ExitStack) -> None:
+        stack.enter_context(self.exitButton)
+        if isinstance(self.screen, AutomaticStack):
+            stack.enter_context(self.screen)
+
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.background.draw(window, scale)
+        self.title.draw(window, scale)
+        self.exitButton.draw(window, scale)
+        self.screen.draw(window, scale)
+
+    def reposition(self, position: Inferable[Point]) -> 'MenuWindow':
+        return MenuWindow(position, self.size, self.background.color, self.title, self.close, self.screen)

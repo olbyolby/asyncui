@@ -193,4 +193,23 @@ class Primes:
 primes = Primes()
 
 from typing import get_type_hints as getTypeHints, Annotated
+import asyncio
+class EventDispatcher(Generic[T]):
+    def __init__(self) -> None:
+        self.handlers: set[Callable[[T], None]] 
+        self._nextEvent = asyncio.Future[T]()
 
+    def addEventHandler(self, handler: Callable[[T], None]) -> None:
+        self.handlers.add(handler)
+    def removeEventHandler(self, handler: Callable[[T], None]) -> None:
+        self.handlers.remove(handler)
+    def getNextEvent(self) -> asyncio.Future[T]:
+        return self._nextEvent
+    
+    def notify(self, data: T) -> None:
+        self._nextEvent.set_result(data)
+        self._nextEvent = asyncio.Future()
+        for handler in {*self.handlers}:
+            handler(data)
+
+    
