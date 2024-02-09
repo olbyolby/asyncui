@@ -233,8 +233,7 @@ class InputBoxDisplay(Drawable):
         self.background = background.reposition(position)
 
         if position is not ...:
-            height = (background.size[1] - text.height) // 2
-            self.text = text.reposition((position[0], position[1] + height))
+            self.text = text.reposition((position[0], position[1]))
         else:
             self.text = text
 
@@ -299,10 +298,12 @@ class InputBox(Drawable, AutomaticStack):
         - Scrolling when text is too long
     
     """
-    def __init__(self, textBox: InputBoxDisplay, onEnter: Callable[[str], None] | None) -> None:
-        self.textBox = textBox.changeCursorShown(False)
+    onChange: Callable[[str], None | bool] | None = None
+    def __init__(self, textBox: InputBoxDisplay, onEnter: Callable[[str], None] | None, onChange: Callable[[str], None | bool] | None) -> None:
+        self.position = textBox.position
+        self.__textBox = textBox.changeCursorShown(False)
         self.onEnter = onEnter
-
+        self.onChange = onChange
 
         self._focused = False
         self._focuser = Focusable(textBox.position, textBox.size, self._onFocus, self._onUnfocus)
@@ -310,9 +311,24 @@ class InputBox(Drawable, AutomaticStack):
     def draw(self, window: pygame.Surface, scale: float) -> None:
         self.textBox.draw(window, scale)
     def reposition(self, position: Point | EllipsisType) -> 'InputBox':
-        return InputBox(self.textBox.reposition(position), self.onEnter)
+        return InputBox(self.textBox.reposition(position), self.onEnter, self.onChange)
     def rescale(self, factor: float) -> 'InputBox':
-        return InputBox(self.textBox.rescale(factor), self.onEnter)
+        return InputBox(self.textBox.rescale(factor), self.onEnter, self.onChange)
+
+    
+    def getSize(self) -> Size:
+        return self.textBox.size
+    size = cachedProperty[Size](getSize)
+
+    @property
+    def textBox(self) -> InputBoxDisplay:
+        return self.__textBox
+    @textBox.setter
+    def textBox(self, value: InputBoxDisplay) -> None:
+        if self.onChange is not None:
+            if self.onChange(value.text.text) is not False:
+                self.__textBox = value
+            
 
     def _onFocus(self) -> None:
         self.textBox = self.textBox.changeCursorShown(True)
@@ -394,11 +410,11 @@ class Line(Drawable):
 
 class Group(Drawable, AutomaticStack):
     
-    def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable], widgetPositions: Inferable[Sequence[Point]] = ...) -> None:
+    def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable], widgetPositions: Inferable[list[Point]] = ...) -> None:
         self.position = position
   
         if widgetPositions is ...:
-            self.orignal_positions: Sequence[Point] = [widget.position for widget in widgets]
+            self.orignal_positions = [widget.position for widget in widgets]
         else:
             self.orignal_positions = widgetPositions
         if position is not ...:
@@ -432,7 +448,9 @@ class Group(Drawable, AutomaticStack):
     def body(self) -> pygame.Rect:
         return self._boundingRect((widget.body for widget in self._widgets))
     
-    
+    def appendWidgets(self, widgets: Iterable[Drawable]) -> Self:
+        widgets = list(widgets)
+        return type(self)(self.position, list(self._widgets)+widgets, self.orignal_positions + [widget.position for widget in widgets])
     
     def get_size(self) -> Size:
         return self.body.width, self.body.height
@@ -509,3 +527,26 @@ class Circle(Drawable):
 
     def reposition(self, position: Point | EllipsisType) -> Circle:
         return Circle(self.position, self.color, self.radius, self.thickness)
+    
+
+class Button(Drawable, AutomaticStack):
+    size = Placeholder[Size]()
+    def __init__(self, position: Inferable[Point], widget: Drawable, on_click: Callable[[], None]) -> None:
+        self.position = position
+        self.widget = widget.reposition(position)
+        self.size = widget.size
+        self.on_click = on_click
+
+    @cachedProperty[Clickable]
+    def _clicker(self) -> Clickable:
+        return Clickable(self.position, self.size, lambda e: self.on_click())
+    
+    @stackEnabler
+    def enable(self, stack: ExitStack) -> None:
+        stack.enter_context(self._clicker)
+
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.widget.draw(window, scale)
+
+    def reposition(self, position: Point | EllipsisType) -> 'Button':
+        return Button(position, self.widget, self.on_click)

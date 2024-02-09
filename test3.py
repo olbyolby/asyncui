@@ -192,3 +192,5 @@ class Primes:
     
 primes = Primes()
 
+from typing import get_type_hints as getTypeHints, Annotated
+
