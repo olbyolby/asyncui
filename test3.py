@@ -1,6 +1,6 @@
 from typing import TypeVar, TypeVarTuple, Generic, Callable, Sequence, Iterable, Generator, no_type_check, Any, overload, Union, Protocol
 from types import EllipsisType
-
+from __future__ import annotations
 
 
 T = TypeVar('T')
@@ -192,24 +192,39 @@ class Primes:
     
 primes = Primes()
 
-from typing import get_type_hints as getTypeHints, Annotated
+from typing import Generator, Coroutine
 import asyncio
+
+def autoTask(function: Callable[[*Ts], Coroutine[Any, Any, T]]) -> Callable[[*Ts], asyncio.Task[T]]:
+    def wrapper(*args: *Ts) -> asyncio.Task[T]:
+        return asyncio.create_task(function(*args))
+    return wrapper
+
+EventCallback = Union[Callable[[T], None], 'EventDispatcher[T]'] # Union 'cause EventDispatcher isn't defined yet
 class EventDispatcher(Generic[T]):
-    def __init__(self) -> None:
-        self.handlers: set[Callable[[T], None]] 
-        self._nextEvent = asyncio.Future[T]()
+    def __init__(self, default_handler: Callable[[T], None] | EventDispatcher[T] | None = None) -> None:
+        self.handlers: set[Callable[[T], None]] = set()
+        if isinstance(default_handler, EventDispatcher):
+            self.handlers.update(default_handler.handlers)
+        elif default_handler is not None:
+            self.handlers.add(default_handler)
+
+        self._next_event = asyncio.Future[T]()
 
     def addEventHandler(self, handler: Callable[[T], None]) -> None:
         self.handlers.add(handler)
     def removeEventHandler(self, handler: Callable[[T], None]) -> None:
         self.handlers.remove(handler)
     def getNextEvent(self) -> asyncio.Future[T]:
-        return self._nextEvent
+        return self._next_event
     
     def notify(self, data: T) -> None:
-        self._nextEvent.set_result(data)
-        self._nextEvent = asyncio.Future()
+        self._next_event.set_result(data)
+        self._next_event = asyncio.Future()
         for handler in {*self.handlers}:
             handler(data)
+
+    def __await__(self) -> Generator[Any, None, T]:
+        return self._next_event.__await__()
 
     

@@ -11,6 +11,7 @@ from asyncUi import events
 from math import sin, cos, radians
 from contextlib import ExitStack
 from dataclasses import dataclass, InitVar
+from functools import cached_property
 import pygame
 import datetime
 import string
@@ -33,6 +34,7 @@ arial = fonts.fontManager.loadSystemFont('arial')
 BLACK = Color(0, 0, 0)
 RED = Color(255, 0, 0)
 WHITE = Color(255, 255, 255)
+GREEN = Color(0, 255, 0)
 
 def clockPosition(angle: float, length: int) -> Point:
     angle = radians(180-angle)
@@ -43,13 +45,13 @@ async def waitForTime(minutes: int) -> None:
     sinceMidnight = now.minute + now.hour * 60
 
     timeUntil = minutes - sinceMidnight
-    print(minutes, sinceMidnight)
+
     if timeUntil < 0:
-        print("next day")
+
         # Wait until next day
         return await asyncio.sleep((24*60 - sinceMidnight + minutes)*60)
     else:
-        print(f"sleeping for {timeUntil}")
+
         return await asyncio.sleep(timeUntil*60 - now.second)
 
 
@@ -126,30 +128,17 @@ class Clock(Drawable, AutomaticStack):
 
 class Alarm(Drawable, AutomaticStack):
     size = Placeholder[Size]()
-    def __init__(self, position: Point | EllipsisType, size: Size, alarm: AlarmData, setOffAlarm: Callable[[AlarmData, Callable[[], None]], None]) -> None:
+    def __init__(self, position: Point | EllipsisType, size: Size, alarm: AlarmData) -> None:
         self.position = position
         self.size = size
-        self.size = size
         self.alarm = alarm
-        self.setOffAlarm = setOffAlarm
+
 
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
-        stack.callback(asyncio.ensure_future(self._waitToSetOff()).cancel)
+        pass
         
-    
-    async def _waitToSetOff(self) -> None:
-        await waitForTime(self.alarm.hour*60+self.alarm.minute)
-        alarmSound = asyncio.ensure_future(self._alarmNoise())
-        def _cancel() -> None:
-            alarmSound.cancel()
-        self.setOffAlarm(self.alarm, _cancel)
-    async def _alarmNoise(self) -> None:
-        while True:
-            for i in range(10):
-                winsound.Beep(i+100, 50)
-            await asyncio.sleep(1)
     
     @property
     def alarm(self) -> AlarmData:
@@ -169,19 +158,65 @@ class Alarm(Drawable, AutomaticStack):
 
     def reposition(self, position: EllipsisType | Point) -> 'Alarm':
         assert position is not ...
-        return Alarm(position, self.size, self.alarm, self.setOffAlarm)
+        return Alarm(position, self.size, self.alarm)
+    
+class AlarmInput(Drawable, AutomaticStack):
+    size = Placeholder[Size]()
+    def __init__(self, position: Point, size: Size, addAlarm: Callable[[int, int, str], None]) -> None:
+        self.position = position
+        self.size = size
+        self.addAlarm = addAlarm
+
+        self.accept = Button(position, Box(position, (25, 25), GREEN), self._addAlarm)
+        self.name = InputBox(InputBoxDisplay((position[0]+25, position[1]), Text(..., arial, 16, BLACK, " name "), Box(..., (90, 25), WHITE), 0), None, lambda s: None)
+        self.hour = InputBox(InputBoxDisplay((position[0]+115, position[1]), Text(..., arial, 16, BLACK, "00"), Box(..., (25, 25), WHITE), 0), None, self._acceptHour)
+        self.minute = InputBox(InputBoxDisplay((position[0]+140, position[1]), Text(..., arial, 16, BLACK, "00"), Box(..., (25, 25), WHITE), 0), None, self._acceptMinute)
+        self.seperator = Text((position[0]+135, position[1]), arial, 16, BLACK, ":")
+
+    def _acceptHour(self, text: str) -> bool:
+        return all(char in string.digits for char in text) and len(text)<=2
+    def _acceptMinute(self, text: str) -> bool:
+        return all(char in string.digits for char in text) and len(text)<=2
+    
+    def _addAlarm(self) -> None:
+        hourText = self.hour.textBox.text.text
+        minuteText = self.minute.textBox.text.text
+
+
+        if hourText == '' or (hour:=int(hourText)) > 24:
+            return
+        if minuteText == '' or (minute:=int(minuteText)) > 60:
+            return
+        self.addAlarm(hour, minute, self.name.textBox.text.text)
+
+    @stackEnabler
+    def enable(self, stack: ExitStack) -> None:
+        stack.enter_context(self.name)
+        stack.enter_context(self.hour)
+        stack.enter_context(self.minute)
+        stack.enter_context(self.accept)
+
+    
+
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.accept.draw(window, scale)
+        self.name.draw(window, scale)
+        self.hour.draw(window, scale)
+        self.minute.draw(window, scale)
+        self.seperator.draw(window, scale)
+
+    def reposition(self, position: tuple[int, int] | EllipsisType) -> Self:
+        raise NotImplementedError()
     
 
 class AlarmsMenu(Drawable, AutomaticStack):
     size = Placeholder[Size]()
-    def __init__(self, position: Point | EllipsisType, size: Size, setOffAlarm: Callable[[AlarmData, Callable[[], None]], None]) -> None:
+    def __init__(self, position: Point | EllipsisType, size: Size, addAlarm: Callable[[AlarmData], None]) -> None:
         if position is ...:
             position = (0,0)
         self.position = position
         self.size = size
-        self.setOffAlarm = setOffAlarm
-
-        self.handles: list[asyncio.Handle] = []
+        self.addAlarm = addAlarm
 
         self.title = ToolBar(position, [
             Group(..., [
@@ -202,22 +237,45 @@ class AlarmsMenu(Drawable, AutomaticStack):
         ])
 
 
-        self.alarms: ToolBar = ToolBar((position[0], position[1] + self.title.size[1]), [
-            Alarm(..., (25, 100), AlarmData(1, 14, 53, "Alarm"), setOffAlarm),
+        self.alarmState = MutableContextManager[VirticalMenu](None)
+        self.alarms: VirticalMenu = VirticalMenu((position[0], position[1] + self.title.size[1]), [
             ])
+        
+        
+
+        self.input = AlarmInput((position[0], 150), (size[0], 25), self._addAlarm)
+
+    @property
+    def alarms(self) -> VirticalMenu:
+        return self._alarms
+    @alarms.setter
+    def alarms(self, value: VirticalMenu) -> None:
+        self.alarmState.changeContext(value)
+        self._alarms = value
+    def _addAlarm(self, hour: int, minute: int, name: str) -> None:
+        data = AlarmData(len(self.alarms._widgets), hour, minute, name)
+        self.addAlarm(data)
+        self.alarms = self.alarms.appendWidgets([Alarm(..., (100, 25), data), ])
 
 
     def draw(self, window: pygame.Surface, scale: float) -> None:
         self.title.draw(window, scale)
         self.alarms.draw(window, scale)
+        self.input.draw(window, scale)
 
+    def disableInput(self) -> None:
+        self.input.disable()
+    def enableInput(self) -> None:
+        self.input.enable()
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
-        stack.enter_context(self.alarms)
+    
+        stack.enter_context(self.alarmState)
+        stack.enter_context(self.input)
 
     def reposition(self, position: Point | EllipsisType) -> 'AlarmsMenu':
-        return AlarmsMenu(position, self.position, self.setOffAlarm)
+        return AlarmsMenu(position, self.size, self.addAlarm)
 
 
 class App(Drawable, AutomaticStack):
@@ -231,13 +289,30 @@ class App(Drawable, AutomaticStack):
         self.cancelAlarm: Button | None = None
  
         self._alarmMenuOn = Flag()
-        self._alarmMenuOn.set()
         self.alarmMenu = MenuWindow((10, 10), (200, 150), WHITE, 
                                    Text(..., arial, 16, BLACK, "Alarms"),
-                                   self._alarmMenuOn.unset,
-                                   AlarmsMenu(..., size, self._setOffAlarm))
+                                   self._closeAlarmMneu,
+                                   AlarmsMenu(..., size, self._addAlarm))
         
+        self.alarmHandles: list[asyncio.Task[None]] = []
+    def _addAlarm(self, alarm: AlarmData) -> None:
+        self.alarmHandles.append(asyncio.ensure_future(self._waitToSetOff(alarm)))
+    
+    def _closeAlarmMneu(self) -> None:
+        self._alarmMenuOn.unset()
+        self.alarmMenu.screen.disableInput()
 
+    async def _waitToSetOff(self, alarm: AlarmData) -> None:
+        await waitForTime(alarm.hour*60+alarm.minute)
+        alarmSound = asyncio.ensure_future(self._alarmNoise())
+        def _cancel() -> None:
+            alarmSound.cancel()
+        self._setOffAlarm(alarm, _cancel)
+    async def _alarmNoise(self) -> None:
+        while True:
+            for i in range(10):
+                winsound.Beep(i+100, 50)
+            await asyncio.sleep(1)
 
     def _setOffAlarm(self, alarm: AlarmData, cancel: Callable[[], None]) -> None:
         alarmText = Text(..., arial, 16, BLACK, alarm.name)
@@ -275,6 +350,7 @@ class App(Drawable, AutomaticStack):
     def openAlarms(self, e: events.KeyDown) -> None:
         if e.key == events.keyboard.Keys.A:
             self._alarmMenuOn.set()
+            self.alarmMenu.screen.enableInput()
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:

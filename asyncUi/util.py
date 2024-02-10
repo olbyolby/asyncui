@@ -1,6 +1,9 @@
-from typing import Any, Iterable, Union, cast, Generic, TypeVar, overload, Self, TypeVarTuple, Awaitable, Callable, Protocol, Never
+from __future__ import annotations
+from typing import Any, Iterable, Union, cast, Generic, TypeVar, overload, Self, TypeVarTuple, Awaitable, Callable, Protocol, Never, Generator
 from types import EllipsisType, TracebackType
 from functools import wraps
+
+
 import asyncio
 
 T = TypeVar('T')
@@ -37,92 +40,34 @@ class Placeholder(Generic[T]):
 Inferable = Union[T, EllipsisType]
 
 Ts = TypeVarTuple('Ts')
-CallbackT = 'Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts | None]'
-class EventDispatcher(Generic[*Ts]):
-    """
-    Provides a "generalization" of callback functions, supporting both asynchronous and synchronous callbacks.
-    In addition, callbacks can take arguments for any associated data with the object.
-    This is useful for using callback functions in systems like UIs.
+EventCallback = Union[Callable[[T], None], 'EventDispatcher[T]'] # Union 'cause EventDispatcher isn't defined yet
+class EventDispatcher(Generic[T]):
+    def __init__(self, default_handler: Callable[[T], None] | EventDispatcher[T] | None = None) -> None:
+        self.handlers: set[Callable[[T], None]] = set()
+        if isinstance(default_handler, EventDispatcher):
+            self.handlers.update(default_handler.handlers)
+        elif default_handler is not None:
+            self.handlers.add(default_handler)
 
-    Example:
-        class Button:
-            def __init__(self) -> None:
-                self.onclick = EventDispatcher[ClickEvent]
-            def eventHandler(self, event: Event) -> None:
-                #Event handling code here
-                ...
-                self.onclick.notify(event)
-        
-        button = Button()
+        self._next_event = asyncio.Future[T]()
 
-        button.onclick.addListener(lambda e: print(f"You clicked {e.pos} from a synchronous callback"))
-        
-        async def main():
-            event = await button.onclick.listen()
-            print(f"You clicked {event.pos} but asynchronously!")
-
-        asyncio.run(main())
-    """
-    def __init__(self, defaultCallback: 'Callable[[*Ts], None | Awaitable[None]] | EventDispatcher[*Ts] | None' = None) -> None:
-        """
-        Construct an `EventDispatcher`, takes an optional default callback
-
-        The default callback can be ether None, which will register no callbacks,
-        or a callable taking event data, which can be both synchronous or asynchronous,
-        or another EventDispatcher, which will copy it's event listeners.
-        """
-        if defaultCallback is None:
-            self.listeners = set[Callable[[*Ts], None | Awaitable[None]]]()
-        elif isinstance(defaultCallback, EventDispatcher):
-            defaultCallback = cast(EventDispatcher[*Ts], defaultCallback)
-            self.listeners = defaultCallback.listeners.copy()
-        else:
-            self.listeners = {defaultCallback}
-    def addListener(self, listener: Callable[[*Ts], None | Awaitable[None]]) -> Callable[[*Ts], None | Awaitable[None]]:
-        """
-        Add an event listener, will be called when the next event is received
-
-        The provided listener must be a callable taking the event's data.
-        Both Async and Synchronous functions are support
-        """
-        self.listeners.add(listener)
-        return listener
-    def removeListener(self, listener: Callable[[*Ts], None | Awaitable[None]]) -> None:
-        """
-        Remove an event listener
-
-        If the provided listener is not registered, it will throw an exception.
-        """
-        self.listeners.remove(listener)
-    def listen(self) -> Awaitable[tuple[*Ts]]:
-        """
-        Wait for the next event to be recived, returning that event's data.
-
-        Allows for asynchronously awaiting for the next event
-        """
-        future = asyncio.Future[tuple[*Ts]]()
-        @self.addListener
-        def resolver(*results: *Ts) -> None:
-            self.removeListener(resolver)
-            future.set_result(results)
-        return future
+    def addEventHandler(self, handler: Callable[[T], None]) -> None:
+        self.handlers.add(handler)
+    def removeEventHandler(self, handler: Callable[[T], None]) -> None:
+        self.handlers.remove(handler)
+    def getNextEvent(self) -> asyncio.Future[T]:
+        return self._next_event
     
-    def notify(self, *data: *Ts) -> None:
-        """
-        Notify all awaiting coroutines and run all event listeners.
-        
-        All synchronous calllbacks are executed immediately and all asynchronous ones
-        are awaited via asyncio.gather
-        """
+    def notify(self, data: T) -> None:
+        self._next_event.set_result(data)
+        self._next_event = asyncio.Future()
+        for handler in {*self.handlers}:
+            handler(data)
 
-        for listener in frozenset(self.listeners):
-            result = listener(*data)
-            if isinstance(result, Awaitable):
-                asyncio.ensure_future(result)
+    def __await__(self) -> Generator[Any, None, T]:
+        return self._next_event.__await__()
 
-
-    def __contains__(self, handler: Callable[[*Ts], None | Awaitable[None]]) -> bool:
-        return handler in self.listeners
+    
 
 class Flag:
     def __init__(self) -> None:
@@ -178,3 +123,4 @@ class MutableContextManager(Generic[ContextT]):
         if self.context is not None:
             self.context.__exit__(None, None, None)
             self.context = None
+

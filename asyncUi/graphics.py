@@ -3,7 +3,7 @@ from types import EllipsisType
 from asyncUi.display import Point
 from .util import Placeholder, Inferable, Flag, EventDispatcher, listify
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler, Rectangular
-from typing import TypeVar, Iterable, Final, Self, Callable, Protocol, Sequence, final
+from typing import TypeVar, Iterable, Final, Self, Callable, Protocol, Sequence, final, Generic
 from functools import cached_property as cachedProperty, wraps
 from .resources.fonts import Font
 from contextlib import ExitStack
@@ -328,6 +328,8 @@ class InputBox(Drawable, AutomaticStack):
         if self.onChange is not None:
             if self.onChange(value.text.text) is not False:
                 self.__textBox = value
+        else:
+            self.__textBox = value
             
 
     def _onFocus(self) -> None:
@@ -430,7 +432,6 @@ class Group(Drawable, AutomaticStack):
             yield widget.reposition(addPoint(position, self.position))
 
     def draw(self, window: pygame.Surface, scale: float) -> None:
-        
         for widget in self._widgets:
             widget.draw(window, scale)
     
@@ -554,9 +555,10 @@ class Button(Drawable, AutomaticStack):
     def reposition(self, position: Point | EllipsisType) -> 'Button':
         return Button(position, self.widget, self.on_click)
     
-class MenuWindow(Drawable, AutomaticStack):
+
+class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
     size = Placeholder[Size]()
-    def __init__(self, position: Inferable[Point], size: Size, color: Color, title: Text, close: Callable[[], None], inside: Drawable) -> None:
+    def __init__(self, position: Inferable[Point], size: Size, color: Color, title: Text, close: Callable[[], None], inside: DrawableT) -> None:
         self.position = position
         self.size = size
 
@@ -582,5 +584,5 @@ class MenuWindow(Drawable, AutomaticStack):
         self.exitButton.draw(window, scale)
         self.screen.draw(window, scale)
 
-    def reposition(self, position: Inferable[Point]) -> 'MenuWindow':
+    def reposition(self, position: Inferable[Point]) -> 'MenuWindow[DrawableT]':
         return MenuWindow(position, self.size, self.background.color, self.title, self.close, self.screen)
