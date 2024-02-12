@@ -1,13 +1,49 @@
 from typing import Any, Self
 from . import keyboard, mouse
 from inspect import get_annotations as getAnnotations
-from enum import Enum
+from enum import Enum, Flag
 import pygame
 
 
-eventTypes: dict[int, type['Event']] = {}
+event_types: dict[int, type['Event']] = {}
 
 class Event:
+    """
+    The base class for all asyncUi event wrappers, wraps pygame events
+
+    Subclassing behavior:
+        This class is intended to be subclassed to create custom event types, or for wrapping external event types.
+        If an external event type is being wrapped(Like MouseButtonDown), the `type` attribute must be specified, 
+        if a new event is wanted, it can be left blank, in which case a new type will be assigned with `pygame.event.custom_type()`.
+
+        Any attributes of that event ('buttons', 'pos', etc) should be specified with a type annotation, 
+        because they will be filled by `marshal` when passed to event handlers, in addition, support for
+        Enums and Flags comes out of the box, if an attribute is annotated with an Enum or a Flag, `marshal` will
+        convert the value from the pygame event to the corresponding enum value.
+
+        If more complex marshaling behavior is desired(say, scaling points or adding attributes), then 
+        `_marshal` may be overridden. It takes a pygame event and should construct a new event of that type,
+        in addition, `_get_pygame_event` can be overridden for more complex behavior when converting back to a pygame event.
+
+        The subclass will also be added to the `event_types` dictionary, which maps event's .type attribute to the event class.
+        
+    Marshaling:
+        when an event if recieved from pygame, the event loop must convert it to the type event handlers expect, so it maintains 
+        a list of event types and if it contains one with a matching 'type', it calls it's `_marshal` function, which copies all
+        expceted attributes as well as cast any values form the pygame type, to it's expected type(like int -> Keys in KeyDown).
+        This allows events to have more complex and custom behavior(Like, say, method functions), and for better type safety when
+        working with event types. 
+
+
+    Methods:
+        _marshal - convert a pygame event into this event, can be subclassed, but not used directly, use `marshal()` for that.
+        _get_pygame_event - convert an instance of this class into an equivalent pygame event, is called by `toPygameEvent`
+    Attributes:
+        type - The type id of the event, same as pygame's type attribute. If one is not specified by a subclass, 
+        it will be implicitly set with pygame.event.custom_type()
+        _orgin_event - The pygame event this event originated from, set by `_marshal`, and can be recreived by `_get_pygame_event
+    """
+
     type: int = -1
     _orgin_event: pygame.event.Event | None = None
 
@@ -16,7 +52,7 @@ class Event:
         """
         Base implementation of the event type marshaler
 
-        Reads through the type's annotation's and finds all enumerations,
+        Reads through the type's annotation's and finds all enumerations(Enum | Flag subclasses),
         it then converts the corasponding event value into the enum, and returns
         a new instance with converted enums
 
@@ -31,21 +67,13 @@ class Event:
             if name == 'type': #type is a speical case
                 continue
 
-            if isinstance(attrType, type) and issubclass(attrType, Enum):
+            if isinstance(attrType, type) and issubclass(attrType, Enum | Flag):
                 vars(newEvent)[name] = attrType(eventData[name])
             else:
                 vars(newEvent)[name] = eventData[name]
         newEvent._orgin_event = event
 
         return newEvent
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        if not hasattr(cls, 'type') or cls.type == -1:
-            cls.type = pygame.event.custom_type()
-        if not isinstance(cls.type, int):
-            raise RuntimeError(f'Event type {cls.__name__} has an invalid ".type" attribute(it must be an integer)') 
-        
-        eventTypes[cls.type] = cls
-        super().__init_subclass__(**kwargs)
     def _get_pygame_event(self) -> pygame.event.Event:
         """
         Return a pygame event reperesenting can event object.
@@ -58,17 +86,38 @@ class Event:
             return self._orgin_event
         else:
             return pygame.event.Event(self.type, vars(self))
+        
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # If no type is specified, create a new custom type
+        if not hasattr(cls, 'type') or cls.type == -1:
+            cls.type = pygame.event.custom_type()
+
+        # Make sure the type is valid
+        if not isinstance(cls.type, int):
+            raise RuntimeError(f'Event type {cls.__name__} has an invalid ".type" attribute(it must be an integer)') 
+        
+        # Register the newly created event's type
+        event_types[cls.type] = cls
+
+        super().__init_subclass__(**kwargs)
 
 
 def toPygameEvent(event: Event | pygame.event.Event) -> pygame.event.Event:
+    """Convert an asyncUi event to a pygame event"""
     if isinstance(event, pygame.event.Event):
         return event
     return event._get_pygame_event()
 
 def marshal(event: pygame.event.Event) -> Event | None:
-    if event.type not in eventTypes:
+    """
+    Preform type marshalling to convert a pygame event to the equivalent asyncUi event, returning None if there is no asyncUi equivalent.
+
+    See `Event._marshal` for details.
+    """
+    if event.type not in event_types:
         return None
-    eventType = eventTypes[event.type]
+    
+    eventType = event_types[event.type]
 
     return eventType._marshal(eventType.__new__(eventType), event)
 
