@@ -1,4 +1,5 @@
 from typing import Any, Self
+
 from . import keyboard, mouse
 from inspect import get_annotations as getAnnotations
 from enum import Enum, Flag
@@ -48,7 +49,7 @@ class Event:
     _orgin_event: pygame.event.Event | None = None
 
 
-    def _marshal(newEvent: Self, event: pygame.event.Event, /) -> Self:
+    def _marshal(newEvent: Self, event: pygame.event.Event, /) -> None:
         """
         Base implementation of the event type marshaler
 
@@ -73,7 +74,6 @@ class Event:
                 vars(newEvent)[name] = eventData[name]
         newEvent._orgin_event = event
 
-        return newEvent
     def _get_pygame_event(self) -> pygame.event.Event:
         """
         Return a pygame event reperesenting can event object.
@@ -118,8 +118,9 @@ def marshal(event: pygame.event.Event) -> Event | None:
         return None
     
     eventType = event_types[event.type]
-
-    return eventType._marshal(eventType.__new__(eventType), event)
+    newEvent = eventType.__new__(eventType)
+    eventType._marshal(newEvent, event)
+    return newEvent
 
 class KeyDown(Event):
     type: int = pygame.KEYDOWN
@@ -160,6 +161,9 @@ class MouseMove(Event):
     rel: tuple[int, int]
     buttons: mouse.Buttons
     touch: bool
+    def _marshal(newEvent: Self, event: pygame.event.Event) -> None:
+        newEvent.buttons = mouse.Buttons(event.buttons)
+        return super()._marshal(event)
 
 
 class TextInput(Event):
