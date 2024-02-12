@@ -26,11 +26,8 @@ from typing import Protocol, Awaitable, Generic, Callable, TypeVar, cast, Type, 
 from . import events
 from contextvars import Context
 from dataclasses import dataclass
-from threading import Lock
 from types import EllipsisType, TracebackType
-from functools import singledispatch
 from concurrent.futures import Executor, ThreadPoolExecutor
-from concurrent import futures
 
 import logging
 logger = logging.getLogger(__name__)
@@ -60,10 +57,12 @@ class EventHandler(Generic[EventT]):
         self.function = function
         self.event_type = event_type
     def register(self) -> None:
-        if self.registered: return
+        if self.registered: 
+            return
         Window().registerEventHandler(self.event_type, self.function)
     def unregister(self) -> None:
-        if not self.registered: return
+        if not self.registered: 
+            return
         Window().unregisterEventHandler(self.event_type, self.function)
     @property
     def registered(self) -> bool:
@@ -296,7 +295,7 @@ def _isEventLoopRunning() -> bool:
 class _HasFileNumber(Protocol):
     def fileno(self) -> int: ...
 FileDescriptorLike = int | _HasFileNumber
-from socket import socket
+from socket import socket  # noqa: E402
 
 
 class Renderer:
@@ -363,8 +362,10 @@ class Window(asyncio.AbstractEventLoop):
 
 
     def __init__(self, window: pygame.Surface | EllipsisType = ..., title: str | EllipsisType = ...) -> None:
-        if window is ...: return
-        if title is ...: return
+        if window is ...: 
+            return
+        if title is ...: 
+            return
 
         pygame.display.set_caption(title)
         self.size = window.get_size()
@@ -496,7 +497,7 @@ class Window(asyncio.AbstractEventLoop):
         self.default_executor.shutdown(cancel_futures=True)
         self.default_executor = executor
     async def shutdown_default_executor(self, timeout: int | None = None) -> None:
-        assert timeout == None, "timeout not supported in shutdown executor"
+        assert timeout is None, "timeout not supported in shutdown executor"
         self.default_executor.shutdown(cancel_futures=True)
 
     #Factories 
@@ -581,7 +582,7 @@ class Window(asyncio.AbstractEventLoop):
         return self.closed
     
     async def shutdown_asyncgens(self) -> None:
-        warnings.warn("I havn't any idea what t odo on 'shutdown_asyncgens'")
+        warnings.warn("I havn't any idea what to do on 'shutdown_asyncgens'")
         pass
 
     # Exception handling
@@ -703,7 +704,7 @@ class Window(asyncio.AbstractEventLoop):
     async def start_tls(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("pygame event loop does not support start_tls")
     
-import threading
+import threading  # noqa: E402
 class WindowEventLoopPolicy(asyncio.AbstractEventLoopPolicy):
 
     def new_event_loop(self) -> asyncio.AbstractEventLoop:

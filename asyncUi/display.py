@@ -1,6 +1,6 @@
 import pygame
 from abc import ABC, abstractmethod
-from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar, Protocol
+from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar
 from .util import Placeholder
 from .window import Window
 from contextlib import ExitStack
@@ -137,15 +137,3 @@ def drawableRenderer(target: Drawable) -> Callable[[Window], None]:
         target.draw(window.window, window.scaleFactor)
     return wrapper
 
-
-
-class Rectangular(Protocol):
-    @property
-    @abstractmethod
-    def body(self) -> pygame.Rect:
-        ...
-
-    @property
-    @abstractmethod
-    def size(self) -> Size:
-        ...
