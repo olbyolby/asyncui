@@ -1,7 +1,5 @@
 import pygame
-import weakref
 from typing import Callable
-from enum import Enum
 
 class FontSizeManager:
     def __init__(self, font_name: str, font_loader: Callable[[str, int], pygame.font.Font]) -> None:

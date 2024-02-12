@@ -1,12 +1,9 @@
 import pygame
-import asyncio
 from abc import ABC, abstractmethod
-from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar, Generic, Protocol, Final, ClassVar
+from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar, Protocol
 from .util import Placeholder
-from .resources import fonts
 from .window import Window
 from contextlib import ExitStack
-from abc import abstractmethod
 from types import TracebackType, EllipsisType
 from functools import wraps, cached_property as cachedProperty
 

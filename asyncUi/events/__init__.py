@@ -1,7 +1,6 @@
-from typing import Any, Type, Callable, Protocol, Literal, Generic, TypeVar, Annotated, Self
+from typing import Any, Self
 from . import keyboard, mouse
 from inspect import get_annotations as getAnnotations
-from dataclasses import dataclass
 from enum import Enum
 import pygame
 

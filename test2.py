@@ -1,3 +1,4 @@
+# ruff: noqa
 from typing import overload, TypeVar, Protocol, Generic, Type, cast, Self, TypeVarTuple, Callable, Never, Awaitable, Generator
 from types import TracebackType
 import asyncio
@@ -95,7 +96,6 @@ from types import FrameType
 from typing import cast, TypeVar, Any, Iterable
 
 
-T2 = TypeVar('T2')
 def neverNone(var: T2 | None) -> T2:
     if var is None:
         raise ValueError("Unexpected None")
@@ -268,11 +268,3 @@ def createGhetto(group: Type[T2]) -> list[T2]:
 
 from typing import no_type_check
 
-
-x = input()
-y: str = "asadf"
-
-if x=="a":
-    print(x+4)
-else:
-    print("dasf")

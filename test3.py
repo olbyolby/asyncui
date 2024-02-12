@@ -1,6 +1,8 @@
+# ruff: noqa
+from __future__ import annotations
 from typing import TypeVar, TypeVarTuple, Generic, Callable, Sequence, Iterable, Generator, no_type_check, Any, overload, Union, Protocol
 from types import EllipsisType
-from __future__ import annotations
+
 
 
 T = TypeVar('T')

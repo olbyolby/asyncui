@@ -1,9 +1,10 @@
+# ruff: noqa
 from typing import Never, no_type_check,TypeVarTuple, overload, LiteralString, ContextManager, Self, Generic, TypeVar, Callable, Type, Any, cast, Protocol, Mapping, Iterable, Awaitable, Generator, Final
 from types import EllipsisType
 import asyncio
 from abc import *
 from asyncUi.window import Window, eventHandler, eventHandlerMethod
-from asyncUi.graphics import MenuWindow, Line, Polygon, Circle, Button, Group, Box, Text, Clickable, Hoverable, Focusable, InputBoxDisplay, InputBox, ToolBar, centered, VirticalMenu, renderAll
+from asyncUi.graphics import MenuWindow, Line, Polygon, Circle, Button, Group, Box, Text, Clickable, Hoverable, Focusable, InputBoxDisplay, InputBox, HorizontalGroup, centered, VirticalGroup, renderAll
 from asyncUi.display import Size, stackEnabler, AutomaticStack, Drawable, Color, drawableRenderer, Point, Color
 from asyncUi.resources import fonts
 from asyncUi.util import MutableContextManager, Flag, Placeholder
@@ -179,15 +180,15 @@ class AlarmInput(Drawable, AutomaticStack):
         return all(char in string.digits for char in text) and len(text)<=2
     
     def _addAlarm(self) -> None:
-        hourText = self.hour.textBox.text.text
-        minuteText = self.minute.textBox.text.text
+        hourText = self.hour.text_box.text.text
+        minuteText = self.minute.text_box.text.text
 
 
         if hourText == '' or (hour:=int(hourText)) > 24:
             return
         if minuteText == '' or (minute:=int(minuteText)) > 60:
             return
-        self.addAlarm(hour, minute, self.name.textBox.text.text)
+        self.addAlarm(hour, minute, self.name.text_box.text.text)
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
@@ -218,7 +219,7 @@ class AlarmsMenu(Drawable, AutomaticStack):
         self.size = size
         self.addAlarm = addAlarm
 
-        self.title = ToolBar(position, [
+        self.title = HorizontalGroup(position, [
             Group(..., [
                 Box(..., (25, 25), WHITE),
                 Text(..., arial, 16, BLACK, "#"),
@@ -237,8 +238,8 @@ class AlarmsMenu(Drawable, AutomaticStack):
         ])
 
 
-        self.alarmState = MutableContextManager[VirticalMenu](None)
-        self.alarms: VirticalMenu = VirticalMenu((position[0], position[1] + self.title.size[1]), [
+        self.alarmState = MutableContextManager[VirticalGroup](None)
+        self.alarms: VirticalGroup = VirticalGroup((position[0], position[1] + self.title.size[1]), [
             ])
         
         
@@ -246,10 +247,10 @@ class AlarmsMenu(Drawable, AutomaticStack):
         self.input = AlarmInput((position[0], 150), (size[0], 25), self._addAlarm)
 
     @property
-    def alarms(self) -> VirticalMenu:
+    def alarms(self) -> VirticalGroup:
         return self._alarms
     @alarms.setter
-    def alarms(self, value: VirticalMenu) -> None:
+    def alarms(self, value: VirticalGroup) -> None:
         self.alarmState.changeContext(value)
         self._alarms = value
     def _addAlarm(self, hour: int, minute: int, name: str) -> None:

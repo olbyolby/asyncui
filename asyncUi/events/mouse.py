@@ -1,5 +1,4 @@
 import pygame
-from typing import NamedTuple
 from enum import Enum
 
 class Button(Enum):
@@ -16,7 +15,7 @@ class Buttons:
         self.left = bool(buttons[pygame.BUTTON_LEFT])
         self.right = bool(buttons[pygame.BUTTON_RIGHT])
         self.middle = bool(buttons[pygame.BUTTON_MIDDLE])
-    def isDown(self, button: Button) -> bool:
+    def is_down(self, button: Button) -> bool:
         return bool(self.buttons[button.value])
     def __eq__(self, other: object | int | Button) -> bool:
         if not isinstance(other, Button | int):
