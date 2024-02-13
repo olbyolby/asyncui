@@ -237,3 +237,27 @@ class EventDispatcher(Generic[T]):
 from typing import Tuple 
 
 
+def grouped(values: Iterable[T]) -> Iterable[tuple[T, T]]:
+    iterator = iter(values)
+    try:
+        previous = next(iterator)
+    except StopIteration as e:
+        return e.value
+    
+    for value in iterator:
+        yield previous, value
+        previous = value
+
+import time
+import asyncio
+from typing import Generator, Any
+class Interval:
+    def __init__(self, seconds: int) -> None:
+        self.seconds = seconds
+        self.last_run = 0.
+    async def next(self) -> None:
+        delta =  time.time() - self.last_run 
+        await asyncio.sleep(self.seconds - delta)
+        self.last_run = time.time()
+    def __await__(self) -> Generator[Any, None, None]:
+        return self.next().__await__()

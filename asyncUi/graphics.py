@@ -412,28 +412,24 @@ class Line(Drawable):
 
 class Group(Drawable, AutomaticStack):
     
-    def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable], widget_positions: Inferable[list[Point]] = ...) -> None:
+    def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable]) -> None:
         self.position = position
   
-        if widget_positions is ...:
-            self.orignal_positions = [widget.position for widget in widgets]
-        else:
-            self.orignal_positions = widget_positions
         if position is not ...:
-            self._widgets: Sequence[Drawable] = self._positioner(widgets, self.orignal_positions)
+            
+            self._widgets: Sequence[Drawable] = self._positioner(widgets)
         else:
             self._widgets = widgets
     @listify
-    def _positioner(self, widgets: Sequence[Drawable], positions: Sequence[Point]) -> Iterable[Drawable]:
-        for widget, position in zip(widgets, positions):
-            yield widget.reposition(addPoint(position, self.position))
+    def _positioner(self, widgets: Sequence[Drawable]) -> Iterable[Drawable]:
+        yield from widgets
 
     def draw(self, window: pygame.Surface, scale: float) -> None:
         for widget in self._widgets:
             widget.draw(window, scale)
     
     def reposition(self, position: Point | EllipsisType) -> Self:
-        return type(self)(position, self._widgets, self.orignal_positions)
+        return type(self)(position, self._widgets)
     
     @staticmethod
     def _boundingRect(rects: Iterable[pygame.Rect]) -> pygame.Rect:
@@ -451,11 +447,11 @@ class Group(Drawable, AutomaticStack):
     
     def appendWidgets(self, widgets: Iterable[Drawable]) -> Self:
         widgets = list(widgets)
-        return type(self)(self.position, list(self._widgets)+widgets, self.orignal_positions + [widget.position for widget in widgets])
+        return type(self)(self.position, list(self._widgets)+widgets)
     
-    def get_size(self) -> Size:
+    def getSize(self) -> Size:
         return self.body.width, self.body.height
-    size = cachedProperty[Size](get_size)
+    size = cachedProperty[Size](getSize)
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
@@ -465,7 +461,7 @@ class Group(Drawable, AutomaticStack):
 
 class HorizontalGroup(Group):
     @listify
-    def _positioner(self, widgets: Sequence[Drawable], positions: Sequence[Point]) -> Iterable[Drawable]:
+    def _positioner(self, widgets: Sequence[Drawable]) -> Iterable[Drawable]:
         x_offset = self.position[0]
         for widget in widgets:
             yield widget.reposition((x_offset, self.position[1]))
@@ -474,18 +470,32 @@ class HorizontalGroup(Group):
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
 def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
-    x = outter.position[0] + (outter.size[0] - inner.size[0])//2
-    y = outter.position[1] + (outter.size[1] - inner.size[1])//2
-    return inner.reposition((x, y))
+    outter_center = (outter.position[0] + (outter.size[0]//2), outter.position[1] + (outter.size[1]//2))
+    inner_position = (outter_center[0] - inner.size[0]//2, outter_center[1] - inner.size[1]//2)
+    return inner.reposition(inner_position)
 
 class VirticalGroup(Group):
     @listify
-    def _positioner(self, widgets: Sequence[Drawable], positions: Sequence[Point]) -> Iterable[Drawable]:
+    def _positioner(self, widgets: Sequence[Drawable]) -> Iterable[Drawable]:
         y_offset = self.position[1]
         for widget in widgets:
             yield widget.reposition((self.position[0], y_offset))
             y_offset += widget.body.height
 
+
+class ConcentricGroup(Group):
+    @listify
+    def _positioner(self, widgets: Sequence[Drawable]) -> Iterable[Drawable]:
+        max_size_x = 0
+        max_size_y = 0
+        for widget in widgets:
+            max_size_x = max(widget.size[0], max_size_x)
+            max_size_y = max(widget.size[1], max_size_y)
+
+
+        for widget in widgets:
+            corner = (max_size_x - widget.size[0] + self.position[0], max_size_y - widget.size[1] + self.position[1])
+            yield widget.reposition(corner)
     
 class Circle(Drawable):
     def __init__(self, position: Inferable[Point], color: Color, radius: int, thickness: int = 0) -> None:
@@ -499,8 +509,12 @@ class Circle(Drawable):
         pygame.draw.circle(window, self.color, scale.point(addPoint(self.position, (self.radius, self.radius))), self.radius*scale.scale_factor, int(self.thickness*scale.scale_factor))
 
     def reposition(self, position: Point | EllipsisType) -> Circle:
-        return Circle(self.position, self.color, self.radius, self.thickness)
+        return Circle(position, self.color, self.radius, self.thickness)
     
+    def getSize(self) -> Size:
+        return (self.radius, self.radius)
+    size = cachedProperty[Size](getSize)
+
 
 class Button(Drawable, AutomaticStack):
     size = Placeholder[Size]()
