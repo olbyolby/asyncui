@@ -53,13 +53,15 @@ class Scale:
         return (int(point[0] * self.scale_factor), int(point[1] * self.scale_factor))
     def size(self, size: Size) -> Size:
         return self.point(size)
-    def fontSize(self, size: int) -> int:
+    def font(self, size: int) -> int:
         return int(self.scale_factor * size)
     def polygon(self, polygon: Iterable[Point]) -> list[Point]:
         return [self.point(point) for point in polygon]
     def length(self, length: int) -> int:
         return int(length*self.scale_factor)
 
+    def __float__(self) -> float:
+        return self.scale_factor
 
 class AutomaticStack:
     _stack: ExitStack
@@ -71,8 +73,8 @@ class AutomaticStack:
     def disable(self) -> None:
         self.__exit__(None, None, None)
     
-    def __exit__(self, exceptionType: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
-        self._stack.__exit__(exceptionType, exception, traceback)
+    def __exit__(self, exception_type: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
+        self._stack.__exit__(exception_type, exception, traceback)
     def __enter__(self) -> Self:
         self.enable()
         return self
@@ -126,14 +128,14 @@ class Clip:
         self.target = target
         self.area = area
     def __enter__(self) -> Self:
-        self.oldClip = self.target.get_clip()
+        self.old_clip = self.target.get_clip()
         self.target.set_clip(self.area)
         return self
     def __exit__(self, exceptionType: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
-        self.target.set_clip(self.oldClip)
+        self.target.set_clip(self.old_clip)
 
 def drawableRenderer(target: Drawable) -> Callable[[Window], None]:
     def wrapper(window: Window) -> None:
-        target.draw(window.window, window.scaleFactor)
+        target.draw(window.window, window.scale_factor)
     return wrapper
 

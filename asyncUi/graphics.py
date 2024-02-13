@@ -81,7 +81,7 @@ class Text(Drawable):
     def __init__(self, position: Inferable[Point], font: Font, size: int, color: Color, text: Inferable[str]) -> None:
         self.position = position
         self.font = font
-        self.fontSize = size
+        self.font_size = size
         self.color = color
         self.text = text
 
@@ -101,38 +101,38 @@ class Text(Drawable):
         return pygame.Rect(*self.position, *self.size)
     
     def characterPosition(self, index: int) -> Point:
-        return self.font[self.fontSize].size(self.text[:index])[0] + self.position[0], self.position[1]
+        return self.font[self.font_size].size(self.text[:index])[0] + self.position[0], self.position[1]
 
     @cachedProperty
     def height(self) -> int:
-        return self.font[self.fontSize].get_linesize()
+        return self.font[self.font_size].get_linesize()
 
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
         #Check if the scale has changed, if yes, rerender the text
         if self._cached_text is None or self._cached_scale != scale.scale_factor:
             self._cached_scale = scale.scale_factor
-            self._cached_text = self.font[scale.fontSize(self.fontSize)].render(self.text, True, self.color)
+            self._cached_text = self.font[scale.font(self.font_size)].render(self.text, True, self.color)
         
         window.blit(self._cached_text, scale.point(self.position))
 
     def reposition(self, position: Inferable[Point]) -> 'Text':
-        return Text(position, self.font, self.fontSize, self.color, self.text)
+        return Text(position, self.font, self.font_size, self.color, self.text)
     def changeText(self, text: str) -> 'Text':
-        return Text(self.position, self.font, self.fontSize, self.color, text)
+        return Text(self.position, self.font, self.font_size, self.color, text)
     
     @rescaler
     def rescale(self, scale: Scale) -> 'Text':
-        return Text(scale.point(self.position), self.font, scale.fontSize(self.fontSize), self.color, self.text)
+        return Text(scale.point(self.position), self.font, scale.font(self.font_size), self.color, self.text)
 
 
 
 class Clickable(AutomaticStack):
     position = Placeholder[Point]()
-    def __init__(self, position: Inferable[Point], size: Size, onClick: EventCallback[events.MouseButtonUp]) -> None:
+    def __init__(self, position: Inferable[Point], size: Size, on_click: EventCallback[events.MouseButtonUp]) -> None:
         self.position = position
         self.size = size
-        self.clicked = EventDispatcher(onClick)
+        self.clicked = EventDispatcher(on_click)
     
         self.debounce = False
         self._stack = ExitStack()
@@ -143,12 +143,12 @@ class Clickable(AutomaticStack):
     
     @eventHandlerMethod
     def _clickDownHandler(self, event: events.MouseButtonDown) -> None:
-        scale = Scale(Window().scaleFactor)
+        scale = Scale(Window().scale_factor)
         if self.debounce is False and  scale.rect(self.area).collidepoint(event.pos):
             self.debounce = True
     @eventHandlerMethod
     def _clickUpHandler(self, event: events.MouseButtonUp) -> None:
-        scale = Scale(Window().scaleFactor)
+        scale = Scale(Window().scale_factor)
         if self.debounce is True:
             self.debounce = False
             if scale.rect(self.area).collidepoint(event.pos):
@@ -175,7 +175,7 @@ class Hoverable(AutomaticStack):
     
     @eventHandlerMethod
     def _hoverHandler(self, event: events.MouseMove) -> None:
-        scale = Scale(Window().scaleFactor)
+        scale = Scale(Window().scale_factor)
         if self._hovered is False and scale.rect(self.area).collidepoint(event.pos):
             self._hovered = True
             if self.hover_start is not None:
@@ -206,7 +206,7 @@ class Focusable(AutomaticStack):
         return pygame.Rect(*self.position, *self.size) 
     @eventHandlerMethod
     def _clickHandler(self, event: events.MouseButtonDown) -> None:
-        scale = Scale(Window().scaleFactor)
+        scale = Scale(Window().scale_factor)
         if self._selected is True and not scale.rect(self.area).collidepoint(event.pos):
             self._selected = False
             self.unfocused.notify()
@@ -466,10 +466,10 @@ class Group(Drawable, AutomaticStack):
 class HorizontalGroup(Group):
     @listify
     def _positioner(self, widgets: Sequence[Drawable], positions: Sequence[Point]) -> Iterable[Drawable]:
-        xOffset = self.position[0]
+        x_offset = self.position[0]
         for widget in widgets:
-            yield widget.reposition((xOffset, self.position[1]))
-            xOffset += widget.body.width
+            yield widget.reposition((x_offset, self.position[1]))
+            x_offset += widget.body.width
 
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
@@ -481,10 +481,10 @@ def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
 class VirticalGroup(Group):
     @listify
     def _positioner(self, widgets: Sequence[Drawable], positions: Sequence[Point]) -> Iterable[Drawable]:
-        yOffset = self.position[1]
+        y_offset = self.position[1]
         for widget in widgets:
-            yield widget.reposition((self.position[0], yOffset))
-            yOffset += widget.body.height
+            yield widget.reposition((self.position[0], y_offset))
+            y_offset += widget.body.height
 
     
 class Circle(Drawable):

@@ -49,7 +49,7 @@ class Event:
     _orgin_event: pygame.event.Event | None = None
 
 
-    def _marshal(newEvent: Self, event: pygame.event.Event, /) -> None:
+    def _marshal(new_event: Self, event: pygame.event.Event, /) -> None:
         """
         Base implementation of the event type marshaler
 
@@ -62,17 +62,17 @@ class Event:
         data by this function, the 2nd argument, `event`, contains the event being constructed from.
         """
 
-        eventData = vars(event)
-        eventAnnotations: dict[str, type | object] = getAnnotations(type(newEvent))
-        for name, attrType in eventAnnotations.items():
+        event_data = vars(event)
+        event_annotations: dict[str, type | object] = getAnnotations(type(new_event))
+        for name, attr_type in event_annotations.items():
             if name == 'type': #type is a speical case
                 continue
 
-            if isinstance(attrType, type) and issubclass(attrType, Enum | Flag):
-                vars(newEvent)[name] = attrType(eventData[name])
+            if isinstance(attr_type, type) and issubclass(attr_type, Enum | Flag):
+                vars(new_event)[name] = attr_type(event_data[name])
             else:
-                vars(newEvent)[name] = eventData[name]
-        newEvent._orgin_event = event
+                vars(new_event)[name] = event_data[name]
+        new_event._orgin_event = event
 
     def _get_pygame_event(self) -> pygame.event.Event:
         """
@@ -123,10 +123,10 @@ def marshal(event: pygame.event.Event) -> Event | None:
     if event.type not in event_types:
         return None
     
-    eventType = event_types[event.type]
-    newEvent = eventType.__new__(eventType)
-    eventType._marshal(newEvent, event)
-    return newEvent
+    event_type = event_types[event.type]
+    new_event = event_type.__new__(event_type)
+    event_type._marshal(new_event, event)
+    return new_event
 
 class KeyDown(Event):
     type: int = pygame.KEYDOWN

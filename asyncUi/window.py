@@ -442,7 +442,7 @@ class Window(asyncio.AbstractEventLoop):
         pygame.display.set_mode((event.w, newHeight), self.window.get_flags())
 
     @property
-    def scaleFactor(self) -> float:
+    def scale_factor(self) -> float:
         """
         Returns the scale factor between the inital window size and it's current size
         """

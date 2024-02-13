@@ -17,7 +17,7 @@ class Placeholder(Generic[T]):
         self.default = default
     def __set_name__(self, owner: type[T2], name: str) -> None:
         self.name = "_" + name
-        self.attrName = name
+        self.attr_name = name
     
     @overload
     def __get__(self, instance: None, owner: type[T2]) -> Self: ...
@@ -30,7 +30,7 @@ class Placeholder(Generic[T]):
         else:
             assert self.name is not None, "descriptor's name must be set"
             if not hasattr(instance, self.name):
-                raise ValueError(f'attribute {self.attrName} of {instance!r} is not initialized')
+                raise ValueError(f'attribute {self.attr_name} of {instance!r} is not initialized')
             value = cast(T, getattr(instance, self.name))
             return value
     
@@ -96,7 +96,7 @@ def listify(function: Callable[[*Ts], Iterable[T]]) -> Callable[[*Ts], list[T]]:
 class ContextHandler(Protocol):
     def __enter__(self) -> Self:
         ...
-    def __exit__(self, excType: type[BaseException] | None, excValue: BaseException | None, traceback: TracebackType | None, /) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /) -> None:
         ...
 ContextT = TypeVar('ContextT', bound=ContextHandler)
 
