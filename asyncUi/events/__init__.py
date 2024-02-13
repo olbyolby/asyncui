@@ -85,6 +85,12 @@ class Event:
         if self._orgin_event is not None:
             return self._orgin_event
         else:
+            clean_vars: dict[str, Any] = {}
+            for name, value in vars(self).items():
+                if isinstance(value, Enum):
+                    clean_vars[name] = value.value
+                else:
+                    clean_vars[name] = value
             return pygame.event.Event(self.type, vars(self))
         
     def __init_subclass__(cls, **kwargs: Any) -> None:
