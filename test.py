@@ -168,8 +168,8 @@ class AlarmInput(Drawable, AutomaticStack):
 
         self.accept = Button(position, Box(position, (25, 25), GREEN), self._addAlarm)
         self.name = InputBox(InputBoxDisplay((position[0]+25, position[1]), Text(..., arial, 16, BLACK, " name "), Box(..., (90, 25), WHITE), 0), None, lambda s: None)
-        self.hour = InputBox(InputBoxDisplay((position[0]+115, position[1]), Text(..., arial, 16, BLACK, "00"), Box(..., (25, 25), WHITE), 0), None, self._acceptHour)
-        self.minute = InputBox(InputBoxDisplay((position[0]+140, position[1]), Text(..., arial, 16, BLACK, "00"), Box(..., (25, 25), WHITE), 0), None, self._acceptMinute)
+        self.hour = InputBox(InputBoxDisplay((position[0]+115, position[1]), Text(..., arial, 16, BLACK, "00"), Box(..., (25, 25), WHITE), 0), None, None, self._acceptHour)
+        self.minute = InputBox(InputBoxDisplay((position[0]+140, position[1]), Text(..., arial, 16, BLACK, "00"), Box(..., (25, 25), WHITE), 0), None, None, self._acceptMinute)
         self.seperator = Text((position[0]+135, position[1]), arial, 16, BLACK, ":")
 
     def _acceptHour(self, text: str) -> bool:

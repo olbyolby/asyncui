@@ -40,34 +40,34 @@ class Placeholder(Generic[T]):
 Inferable = Union[T, EllipsisType]
 
 Ts = TypeVarTuple('Ts')
-EventCallback = Union[Callable[[T], None], 'EventDispatcher[T]'] # Union 'cause EventDispatcher isn't defined yet
-class EventDispatcher(Generic[T]):
-    def __init__(self, default_handler: Callable[[T], None] | EventDispatcher[T] | None = None) -> None:
-        self.handlers: set[Callable[[T], None]] = set()
+EventCallback = Union[Callable[[*Ts], None], 'EventDispatcher[*Ts]', None] # Union because EventDispatcher isn't defined yet
+class EventDispatcher(Generic[*Ts]):
+    def __init__(self, default_handler: Callable[[*Ts], None] | EventDispatcher[*Ts] | None = None) -> None:
+        self.handlers: set[Callable[[*Ts], None]] = set()
         if isinstance(default_handler, EventDispatcher):
-            self.handlers.update(default_handler.handlers)
+            self.handlers.update(default_handler.handlers) #type: ignore
         elif default_handler is not None:
             self.handlers.add(default_handler)
 
-        self._next_event = asyncio.Future[T]()
+        self._next_event = asyncio.Future[tuple[*Ts]]()
 
-    def addEventHandler(self, handler: Callable[[T], None]) -> None:
+    def addEventHandler(self, handler: Callable[[*Ts], None]) -> None:
         self.handlers.add(handler)
-    def removeEventHandler(self, handler: Callable[[T], None]) -> None:
+    def removeEventHandler(self, handler: Callable[[*Ts], None]) -> None:
         self.handlers.remove(handler)
-    def getNextEvent(self) -> asyncio.Future[T]:
+    def getNextEvent(self) -> asyncio.Future[tuple[*Ts]]:
         return self._next_event
     
-    def notify(self, data: T) -> None:
+    def notify(self, *data: *Ts) -> None:
         self._next_event.set_result(data)
         self._next_event = asyncio.Future()
         for handler in {*self.handlers}:
-            handler(data)
+            handler(*data)
 
-    def __await__(self) -> Generator[Any, None, T]:
+    def __await__(self) -> Generator[Any, None, tuple[*Ts]]:
         return self._next_event.__await__()
 
-    
+
 
 class Flag:
     def __init__(self) -> None:

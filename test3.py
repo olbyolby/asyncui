@@ -1,6 +1,6 @@
 # ruff: noqa
 from __future__ import annotations
-from typing import TypeVar, TypeVarTuple, Generic, Callable, Sequence, Iterable, Generator, no_type_check, Any, overload, Union, Protocol
+from typing import TypeVar, TypeVarTuple, Generic, Callable, Sequence, Iterable, Generator, no_type_check, Any, overload, Union, Protocol, cast
 from types import EllipsisType
 
 
@@ -220,7 +220,13 @@ class EventDispatcher(Generic[T]):
     def getNextEvent(self) -> asyncio.Future[T]:
         return self._next_event
     
-    def notify(self, data: T) -> None:
+    @overload
+    def notify(self, data: T) -> None: ...
+    @overload
+    def notify(self: EventDispatcher[Never]) -> None: ...
+    
+    def notify(self, data: T | None = None) -> None: 
+        data = cast(T, data)
         self._next_event.set_result(data)
         self._next_event = asyncio.Future()
         for handler in {*self.handlers}:
@@ -228,5 +234,6 @@ class EventDispatcher(Generic[T]):
 
     def __await__(self) -> Generator[Any, None, T]:
         return self._next_event.__await__()
+from typing import Tuple 
 
-    
+
