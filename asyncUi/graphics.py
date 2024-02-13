@@ -93,7 +93,7 @@ class Text(Drawable):
 
     
     
-    size = cachedProperty(lambda self: self.font[self.fontSize].size(self.text))
+    size = cachedProperty(lambda self: self.font[self.font_size].size(self.text))
 
 
     @cachedProperty[pygame.Rect]
