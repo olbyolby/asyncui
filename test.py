@@ -63,7 +63,6 @@ class AlarmData:
     minute: int
     name: str
 
-
 def chain(*args: Any) -> None:
     return None
 class Clock(Drawable, AutomaticStack):
@@ -125,7 +124,6 @@ class Clock(Drawable, AutomaticStack):
     def reposition(self, position: Point | EllipsisType) -> 'Clock':
         assert position is not ...
         return Clock(position, self.size, self.radius)
-
 
 class Alarm(Drawable, AutomaticStack):
     size = Placeholder[Size]()
@@ -209,7 +207,6 @@ class AlarmInput(Drawable, AutomaticStack):
     def reposition(self, position: tuple[int, int] | EllipsisType) -> Self:
         raise NotImplementedError()
     
-
 class AlarmsMenu(Drawable, AutomaticStack):
     size = Placeholder[Size]()
     def __init__(self, position: Point | EllipsisType, size: Size, addAlarm: Callable[[AlarmData], None]) -> None:
@@ -278,7 +275,6 @@ class AlarmsMenu(Drawable, AutomaticStack):
     def reposition(self, position: Point | EllipsisType) -> 'AlarmsMenu':
         return AlarmsMenu(position, self.size, self.addAlarm)
 
-
 class App(Drawable, AutomaticStack):
     size = Placeholder[Size]()
     def __init__(self, position: Point, size: Size) -> None:
@@ -305,14 +301,14 @@ class App(Drawable, AutomaticStack):
 
     async def _waitToSetOff(self, alarm: AlarmData) -> None:
         await waitForTime(alarm.hour*60+alarm.minute)
-        alarmSound = asyncio.ensure_future(self._alarmNoise())
+        alarmSound = asyncio.ensure_future(self._alarmNoise(alarm.id))
         def _cancel() -> None:
             alarmSound.cancel()
         self._setOffAlarm(alarm, _cancel)
-    async def _alarmNoise(self) -> None:
+    async def _alarmNoise(self, alarmID: int) -> None:
         while True:
             for i in range(10):
-                winsound.Beep(i+100, 50)
+                winsound.Beep(i+100*(alarmID+1), 50)
             await asyncio.sleep(1)
 
     def _setOffAlarm(self, alarm: AlarmData, cancel: Callable[[], None]) -> None:
@@ -366,11 +362,7 @@ class App(Drawable, AutomaticStack):
         assert position is not ...
         return App(position, self.size)
 
-
 window.startRenderer(30, drawableRenderer(App((0,0), (250, 250)).__enter__()))
-
-
-
 
 
 window.run()

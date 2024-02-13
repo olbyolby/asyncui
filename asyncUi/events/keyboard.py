@@ -1,6 +1,9 @@
 import pygame
+import logging
 from enum import Enum, Flag
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 class ModifierKeys(Flag):
     """
@@ -23,11 +26,7 @@ class ModifierKeys(Flag):
     NumLock = pygame.KMOD_NUM
     AltGr = pygame.KMOD_MODE  # Wtf is AltGr?
 
-    @classmethod
-    def _missing_(cls, value: object) -> int | Any:
-        if isinstance(value, int):
-            return value
-        return super()._missing_(value)
+
 class Keys(Enum):
     """
     An enumeration containing named constants for every pygame key, each has type "Key"
@@ -167,8 +166,11 @@ class Keys(Enum):
     Euro = pygame.K_EURO
     AcBack = pygame.K_AC_BACK
 
+    ErrorKey = -1 # You should not see this, if you do, something has gone horribly wrong.
     @classmethod
     def _missing_(cls, value: object) -> int | Any:
         if isinstance(value, int):
-            return value
+            logger.warn(f"Unknown key with code {value} was recived, returning ErrorKey")
+            return cls.ErrorKey
         return super()._missing_(value)
+    

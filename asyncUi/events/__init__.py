@@ -159,12 +159,8 @@ class MouseMove(Event):
     type: int = pygame.MOUSEMOTION
     pos: tuple[int, int]
     rel: tuple[int, int]
-    buttons: mouse.Buttons
+    buttons: tuple[int, int, int]
     touch: bool
-    def _marshal(newEvent: Self, event: pygame.event.Event) -> None:
-        newEvent.buttons = mouse.Buttons(event.buttons)
-        return super()._marshal(event)
-
 
 class TextInput(Event):
     type: int = pygame.TEXTINPUT
