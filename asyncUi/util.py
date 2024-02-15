@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Iterable, Union, cast, Generic, TypeVar, overload, Self, TypeVarTuple, Callable, Protocol, Generator
+from typing import Awaitable, Any, Iterable, Union, cast, Generic, TypeVar, overload, Self, TypeVarTuple, Callable, Protocol, Generator
 from types import EllipsisType, TracebackType
 from functools import wraps
 
@@ -12,7 +12,7 @@ T2 = TypeVar('T2')
 __all__ = ('Placeholder')
 
 class Placeholder(Generic[T]):
-    def __init__(self, default: T | None = None, name: str | None = None):
+    def __init__(self, default: T, name: str | None = None):
         self.name: str | None = name
         self.default = default
     def __set_name__(self, owner: type[T2], name: str) -> None:
@@ -67,7 +67,27 @@ class EventDispatcher(Generic[*Ts]):
     def __await__(self) -> Generator[Any, None, tuple[*Ts]]:
         return self._next_event.__await__()
 
-
+class CallbackReceiver(Generic[*Ts]):
+    def __init__(self) -> None:
+        self.next_future = asyncio.Future[tuple[*Ts]]()
+    def notify(self, *data: *Ts) -> None:
+        self.next_future.set_result(data)
+        self.next_future = asyncio.Future[tuple[*Ts]]()
+    def getNext(self) -> Awaitable[tuple[*Ts]]:
+        return self.next_future
+    def __await__(self) -> Generator[Any, None, tuple[*Ts]]:
+        return self.next_future.__await__()
+    
+Callback = Union['CallbackWrapper[*Ts]', Callable[[*Ts] , None], None]
+class CallbackWrapper(Generic[*Ts]):
+    def __init__(self, callback: 'Callable[[*Ts], None] | CallbackWrapper[*Ts] | None') -> None:
+        if isinstance(callback, CallbackWrapper):
+            self.callback = callback.callback #type: ignore
+        else:
+            self.callback = callback
+    def invoke(self, *args: *Ts) -> None:
+        if self.callback is not None:
+            self.callback(*args)
 
 class Flag:
     def __init__(self) -> None:

@@ -66,7 +66,7 @@ class AlarmData:
 def chain(*args: Any) -> None:
     return None
 class Clock(Drawable, AutomaticStack):
-    size = Placeholder[Size]()
+    size = Placeholder[Size]((0,0))
     def __init__(self, position: Point, size: Size, radius: int):
 
         self.position = position
@@ -126,7 +126,7 @@ class Clock(Drawable, AutomaticStack):
         return Clock(position, self.size, self.radius)
 
 class Alarm(Drawable, AutomaticStack):
-    size = Placeholder[Size]()
+    size = Placeholder[Size]((0,0))
     def __init__(self, position: Point | EllipsisType, size: Size, alarm: AlarmData) -> None:
         self.position = position
         self.size = size
@@ -160,7 +160,7 @@ class Alarm(Drawable, AutomaticStack):
         return Alarm(position, self.size, self.alarm)
     
 class AlarmInput(Drawable, AutomaticStack):
-    size = Placeholder[Size]()
+    size = Placeholder[Size]((0,0))
     def __init__(self, position: Point, size: Size, addAlarm: Callable[[int, int, str], None]) -> None:
         self.position = position
         self.size = size
@@ -208,7 +208,7 @@ class AlarmInput(Drawable, AutomaticStack):
         raise NotImplementedError()
     
 class AlarmsMenu(Drawable, AutomaticStack):
-    size = Placeholder[Size]()
+    size = Placeholder[Size]((0,0))
     def __init__(self, position: Point | EllipsisType, size: Size, addAlarm: Callable[[AlarmData], None]) -> None:
         if position is ...:
             position = (0,0)
@@ -276,7 +276,7 @@ class AlarmsMenu(Drawable, AutomaticStack):
         return AlarmsMenu(position, self.size, self.addAlarm)
 
 class App(Drawable, AutomaticStack):
-    size = Placeholder[Size]()
+    size = Placeholder[Size]((0,0))
     def __init__(self, position: Point, size: Size) -> None:
         self.position = position
         self.size = size

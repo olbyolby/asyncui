@@ -1,6 +1,6 @@
 from __future__ import annotations
 from types import EllipsisType
-from .util import Placeholder, Inferable, listify, EventCallback, EventDispatcher
+from .util import Placeholder, Inferable, listify, CallbackWrapper, Callback
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler
 from typing import TypeVar, Iterable, Final, Self, Callable, Sequence, Generic
 from functools import cached_property as cachedProperty
@@ -20,7 +20,7 @@ class Box(Drawable):
     filledBox: Final = 0
 
     color = Placeholder[Color](Color(255, 255, 255))
-    size = Placeholder[Size]()
+    size = Placeholder[Size]((0, 0))
     def __init__(self, position: Inferable[Point], size: Inferable[Size], color: Inferable[Color], thinkness: int = filledBox):
         self.position = position
         self.size = size
@@ -128,11 +128,11 @@ class Text(Drawable):
 
 
 class Clickable(AutomaticStack):
-    position = Placeholder[Point]()
-    def __init__(self, position: Inferable[Point], size: Size, on_click: EventCallback[events.MouseButtonUp]) -> None:
+    position = Placeholder[Point]((0,0))
+    def __init__(self, position: Inferable[Point], size: Size, on_click: Callback[events.MouseButtonUp]) -> None:
         self.position = position
         self.size = size
-        self.clicked = EventDispatcher(on_click)
+        self.on_click = CallbackWrapper(on_click)
     
         self.debounce = False
         self._stack = ExitStack()
@@ -152,7 +152,7 @@ class Clickable(AutomaticStack):
         if self.debounce is True:
             self.debounce = False
             if scale.rect(self.area).collidepoint(event.pos):
-                self.clicked.notify(event)
+                self.on_click.invoke(event)
 
     def enable(self) -> None:
         with ExitStack() as stack:
@@ -161,12 +161,12 @@ class Clickable(AutomaticStack):
             self._stack = stack.pop_all()
 
 class Hoverable(AutomaticStack): 
-    position = Placeholder[Point]()
-    def __init__(self, position: Inferable[Point], size: Size, start_hover: EventCallback[events.MouseMove], end_hover: EventCallback[events.MouseMove]) -> None:
+    position = Placeholder[Point]((0,0))
+    def __init__(self, position: Inferable[Point], size: Size, start_hover: Callback[events.MouseMove], end_hover: Callback[events.MouseMove]) -> None:
         self.position = position
         self.size = size
-        self.hover_start = EventDispatcher(start_hover)
-        self.hover_end = EventDispatcher(end_hover)
+        self.on_hover_start = CallbackWrapper(start_hover)
+        self.on_hover_end = CallbackWrapper(end_hover)
 
         self._hovered = False
     @cachedProperty
@@ -178,12 +178,12 @@ class Hoverable(AutomaticStack):
         scale = Scale(Window().scale_factor)
         if self._hovered is False and scale.rect(self.area).collidepoint(event.pos):
             self._hovered = True
-            if self.hover_start is not None:
-                self.hover_start.notify(event)
+            if self.on_hover_start is not None:
+                self.on_hover_start.invoke(event)
         elif self._hovered is True and not scale.rect(self.area).collidepoint(event.pos):
             self._hovered = False
-            if self.hover_end is not None:
-                self.hover_end.notify(event)
+            if self.on_hover_end is not None:
+                self.on_hover_end.invoke(event)
 
     def enable(self) -> None:
         with ExitStack() as stack:
@@ -192,12 +192,12 @@ class Hoverable(AutomaticStack):
             self._stack = stack.pop_all()
 
 class Focusable(AutomaticStack):
-    position = Placeholder[Point]()
-    def __init__(self, position: Inferable[Point], size: Size, on_focus: EventCallback[()], on_unfocus: EventCallback[()]) -> None:
+    position = Placeholder[Point]((0,0))
+    def __init__(self, position: Inferable[Point], size: Size, on_focus: Callback[()], on_unfocus: Callback[()]) -> None:
         self.position = position
         self.size = size
-        self.focused = EventDispatcher(on_focus)
-        self.unfocused = EventDispatcher(on_unfocus)
+        self.on_focus = CallbackWrapper(on_focus)
+        self.on_unfocus = CallbackWrapper(on_unfocus)
     
         self._selected = False
 
@@ -209,10 +209,10 @@ class Focusable(AutomaticStack):
         scale = Scale(Window().scale_factor)
         if self._selected is True and not scale.rect(self.area).collidepoint(event.pos):
             self._selected = False
-            self.unfocused.notify()
+            self.on_unfocus.invoke()
         elif self._selected is False and scale.rect(self.area).collidepoint(event.pos):
             self._selected = True
-            self.focused.notify()
+            self.on_focus.invoke()
 
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
@@ -298,11 +298,11 @@ class InputBox(Drawable, AutomaticStack):
         - Scrolling when text is too long
     
     """
-    def __init__(self, textBox: InputBoxDisplay, on_enter: EventCallback[str], on_change: EventCallback[str], input_validater: Callable[[str], bool] = lambda s: True) -> None:
+    def __init__(self, textBox: InputBoxDisplay, on_enter: Callback[str], on_change: Callback[str], input_validater: Callable[[str], bool] = lambda s: True) -> None:
         self.position = textBox.position
         self.__textBox = textBox.changeCursorShown(False)
-        self.on_enter = EventDispatcher(on_enter)
-        self.on_change = EventDispatcher(on_change)
+        self.on_enter = CallbackWrapper(on_enter)
+        self.on_change = CallbackWrapper(on_change)
         self.input_validater = input_validater
 
         self._focused = False
@@ -327,7 +327,7 @@ class InputBox(Drawable, AutomaticStack):
     def text_box(self, value: InputBoxDisplay) -> None:
         if self.input_validater(value.text.text):
             self.__textBox = value
-            self.on_change.notify(value.text.text)    
+            self.on_change.invoke(value.text.text)    
 
     def _onFocus(self) -> None:
         self.text_box = self.text_box.changeCursorShown(True)
@@ -353,7 +353,7 @@ class InputBox(Drawable, AutomaticStack):
                     self.text_box = self.text_box.changeCursorPosition(self.text_box.cursor_position+1)
                 case events.keyboard.Keys.Return:
                     if self.on_enter is not None:
-                        self.on_enter.notify(self.text_box.text.text)
+                        self.on_enter.invoke(self.text_box.text.text)
     
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
@@ -517,16 +517,16 @@ class Circle(Drawable):
 
 
 class Button(Drawable, AutomaticStack):
-    size = Placeholder[Size]()
-    def __init__(self, position: Inferable[Point], widget: Drawable, on_click: EventCallback[()]) -> None:
+    size = Placeholder[Size]((0,0))
+    def __init__(self, position: Inferable[Point], widget: Drawable, on_click: Callback[()]) -> None:
         self.position = position
         self.widget = widget.reposition(position)
         self.size = widget.size
-        self.clicked = EventDispatcher(on_click)
+        self.clicked = CallbackWrapper(on_click)
 
     @cachedProperty[Clickable]
     def _clicker(self) -> Clickable:
-        return Clickable(self.position, self.size, lambda e: self.clicked.notify())
+        return Clickable(self.position, self.size, lambda e: self.clicked.invoke())
     
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
@@ -540,15 +540,15 @@ class Button(Drawable, AutomaticStack):
     
 
 class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
-    size = Placeholder[Size]()
-    def __init__(self, position: Inferable[Point], size: Size, color: Color, title: Text, close: EventCallback[()], inside: DrawableT) -> None:
+    size = Placeholder[Size]((0,0))
+    def __init__(self, position: Inferable[Point], size: Size, color: Color, title: Text, close: Callback[()], inside: DrawableT) -> None:
         self.position = position
         self.size = size
 
         self.background = Box(position, size, color)
         self.title = title.reposition(position)
         self.screen = inside.reposition(... if position is ... else addPoint(position, (0,self.title.height)))
-        self.close = EventDispatcher(close)
+        self.close = CallbackWrapper(close)
     
     @cachedProperty
     def exitButton(self) -> Button:
