@@ -569,4 +569,3 @@ class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
 
     def reposition(self, position: Inferable[Point]) -> 'MenuWindow[DrawableT]':
         return MenuWindow(position, self.size, self.background.color, self.title, self.close, self.screen)
-    
