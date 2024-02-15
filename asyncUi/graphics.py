@@ -19,7 +19,7 @@ def renderAll(window: pygame.Surface, scale: float, *targets: Drawable) -> None:
 class Box(Drawable):
     filledBox: Final = 0
 
-    color = Placeholder[Color]()
+    color = Placeholder[Color](Color(255, 255, 255))
     size = Placeholder[Size]()
     def __init__(self, position: Inferable[Point], size: Inferable[Size], color: Inferable[Color], thinkness: int = filledBox):
         self.position = position

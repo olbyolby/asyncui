@@ -1,6 +1,6 @@
 import pygame
 from abc import ABC, abstractmethod
-from typing import Self, NamedTuple, Iterable, Type, Callable, TypeVar
+from typing import Self, Iterable, Type, Callable, TypeVar, Iterator, Sequence, overload
 from .util import Placeholder
 from .window import Window
 from contextlib import ExitStack
@@ -19,11 +19,55 @@ __all__ = [
 ]
 
 T = TypeVar('T')
+class SequenceMixin(Sequence[int]):
+    @abstractmethod
+    def _sequence(self) -> Sequence[int]:
+        ...
+    
+    def __len__(self) -> int:
+        return len(self._sequence())
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._sequence())
+    
+    @overload
+    def __getitem__(self, item: int) -> int: ...
+    @overload
+    def __getitem__(self, item: slice) -> Sequence[int]: ...
+    def __getitem__(self, item: slice | int) -> int | Sequence[int]:
+        return self._sequence()[item]
 
-class Color(NamedTuple):
-    red: int
-    green: int
-    blue: int
+class Color(SequenceMixin):
+    def __init__(self, red: int, green: int, blue: int) -> None:
+        self.red = max(0, min(red, 255))
+        self.green = max(0, min(green, 255))
+        self.blue = max(0, min(blue, 255))
+
+    # Useful constants
+    RED: 'Color'
+    GREEN: 'Color'
+    BLUE: 'Color'
+    WHITE: 'Color'
+    BLACK: 'Color'
+
+    
+    def complementary(self) -> 'Color':
+        return self.WHITE - self
+    def __add__(self, other: 'Color') -> 'Color':
+        if not isinstance(other, Color):
+            return NotImplemented
+        return Color(self.red + other.red, self.green + other.green, self.blue + other.blue)
+    def __sub__(self, other: 'Color') -> 'Color':
+        if not isinstance(other, Color):
+            return NotImplemented
+        return Color(self.red - other.red, self.green - other.green, self.blue - other.blue)       
+ 
+    def _sequence(self) -> Sequence[int]:
+        return (self.red, self.green, self.blue)
+Color.RED = Color(255, 0, 0)
+Color.GREEN = Color(0, 255, 0)
+Color.BLUE = Color(0, 0, 255)
+Color.WHITE = Color(255, 255, 255)
+Color.BLACK = Color(0, 0, 0)
 
 Point = tuple[int, int]
 
