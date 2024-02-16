@@ -1,0 +1,1 @@
+import checkers.graphics  # noqa: F401
