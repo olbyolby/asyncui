@@ -8,6 +8,7 @@ from types import EllipsisType
 T = TypeVar('T')
 T2 = TypeVar('T2')
 Ts = TypeVarTuple('Ts')
+T2s = TypeVarTuple('T2s')
 
 def valueIndex(data: Iterable[T | T2], value: T2) -> Generator[int, None, None]:
     for i, dataValue in enumerate(data):
@@ -261,3 +262,38 @@ class Interval:
         self.last_run = time.time()
     def __await__(self) -> Generator[Any, None, None]:
         return self.next().__await__()
+    
+
+from functools import wraps
+def decorator(function: Callable[[*Ts, T], T2]) -> Callable[[*Ts], Callable[[T], T2]]:
+    @wraps(function)
+    def wrapper(*args: *Ts) -> Callable[[T], T2]:
+        def partial_decorator(func: T) -> T2:
+            return function(*args, func)
+        return partial_decorator
+    return wrapper
+
+class Constructor(Generic[T, *Ts]):
+    def __init__(self, function: Callable[[T, *Ts], None]) -> None:
+        self.function = function
+    def __get__(self, instance: T | None, owner: type[T]) -> Callable[[*Ts], T]:
+        def wrapper(*args: *Ts) -> T:
+            new_object = owner.__new__(owner)
+            self.function(new_object, *args)
+            return new_object
+        return wrapper
+    
+
+def statefulFunction(function: Callable[[*Ts], Generator[T, tuple[*T2s], Never]]) -> Callable[[*Ts], Callable[[*T2s], T]]:
+    @wraps(function)
+    def wrapper(*args: *Ts) -> Callable[[*T2s], T]:
+        state = function(*args)
+        # Prime the generator
+        next(state)
+        
+        def sender(*args: *T2s) -> T:
+            return state.send(args)
+        return sender
+    return wrapper
+        
+    

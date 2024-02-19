@@ -1,8 +1,9 @@
 from asyncUi.window import Window, eventHandler
 from asyncUi import events
-from asyncUi.graphics import Box, VirticalGroup, HorizontalGroup, Circle, Clickable
+from asyncUi.graphics import Box, VirticalGroup, HorizontalGroup, Circle, Clickable, Text, Polygon, Line, Group
 from asyncUi.display import drawableRenderer, Drawable, Color, Point, Size, Scale, stackEnabler, AutomaticStack
-from asyncUi.util import Placeholder, Inferable, MutableContextManager, CallbackWrapper, Callback
+from asyncUi.util import Placeholder, Inferable, CallbackWrapper, Callback
+from asyncUi.resources.fonts import fontManager
 from . import engine
 from contextlib import ExitStack
 import pygame
@@ -11,11 +12,13 @@ pygame.init()
 
 
 
-window = Window(pygame.display.set_mode((8*8*10, 8*8*10), pygame.RESIZABLE), "Checkers")
+window = Window(pygame.display.set_mode((8*8*10, 8*8*10*(9/8)), pygame.RESIZABLE), "Checkers")
+
 @eventHandler
 def exiter(e: events.Quit) -> None:
     exit()
 exiter.register()
+arial = fontManager.loadSystemFont('arial')
 
 class BoardBackground(Drawable, AutomaticStack):
     size = Placeholder[Size]((0, 0))
@@ -106,13 +109,13 @@ class CheckersBoard(Drawable, AutomaticStack):
         for y in range(board.board_height):
             for x in range(board.board_width):
                 match board[x, y]:
-                    case engine.Pawn():
-                        
+                    case engine.Pawn() as piece:
+                        offset = self.background.cellPosition((x,y))
                         self.overlay.append(
                             Pawn(
-                                self.background.cellPosition((x,y)), 
+                                (offset[0] + self.position[0], offset[1] + self.position[1]), 
                                 self.background.box_size, 
-                                self._player_color_mapping[board.current_player]
+                                self._player_color_mapping[piece.owner]
                             ))
     
     _player_color_mapping = {
@@ -126,7 +129,89 @@ class CheckersBoard(Drawable, AutomaticStack):
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
         stack.enter_context(self.background)
+
+
+class TeamInfoLeft(Drawable):
+    size = Placeholder((0, 0))
+    def __init__(self, position: Inferable[Point], size: Size, status_color: Color) -> None:
+        self.position = position
+        self.size = size
+        self.status_color = status_color
+
+        name = Text(..., arial, round(size[0]*(4/45)), Color.BLACK, "Red")
+        name = name.reposition((self.position[0] + size[0] - name.size[0], self.position[1]))
+        self.name = name
+   
+
+        overshoot = round(size[0]*(4/45))
+        self.outline = Polygon((name.position[0] - overshoot, self.position[1]), Color.BLACK, [
+            (0,0),
+            (overshoot, name.size[1]),
+            (overshoot + name.size[0], name.size[1]),
+            (overshoot + name.size[0], 0),
+        ], round(size[0]*(2/159)))
+
+        status_length = round(size[0]*(4/79))
+        self.status = Box((self.position[0] + size[0] - status_length, self.position[1] + name.size[1]), (status_length, size[1] - name.size[1]), status_color)
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.status.draw(window, scale)
+        self.name.draw(window, scale)
+        self.outline.draw(window, scale)
+        
+    def reposition(self, position: Inferable[Point]) -> 'TeamInfoLeft':
+        return TeamInfoLeft(position, self.size, self.status_color)
+    
+class BoardInfo(Drawable):
+    size = Placeholder((0, 0))
+    def __init__(self, position: Inferable[Point], size: Size, current_team: engine.Player) -> None:
+        self.position = position
+        self.size = size
+        self.current_team = current_team
+
+        x, y = self.position
+        line_thickness = size[1] // 20
+        self.background = Box(position, size, Color(255, 255//2, 0))
+        self.background_seperator = Line((x, y - line_thickness), Color.BLACK, line_thickness, (0, 0), (size[0], 0))
+        self.team_seperator = Line((self.position[0] + size[0] // 2 - line_thickness//2, self.position[1]), Color.BLACK, line_thickness, (0, 0), (0, size[1]))
+        
+        self.left_info = TeamInfoLeft(position, (size[0] // 2 - line_thickness, size[1]), Color.GREEN if current_team is engine.Player.player1 else Color.RED)
+
+
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.background.draw(window, scale)
+        self.background_seperator.draw(window, scale)
+        self.team_seperator.draw(window, scale)
+
+        self.left_info.draw(window, scale)
+    def reposition(self, position: Inferable[Point]) -> 'BoardInfo':
+        return BoardInfo(position, self.size, self.current_team)
+    
+    def changePlayer(self, current_team: engine.Player) -> 'BoardInfo':
+        return BoardInfo(self.position, self.size, current_team)    
+
 board = engine.Board(None, None, None)
-board[1,1] = engine.Pawn(engine.Player.player1)
-window.startRenderer(30, drawableRenderer(CheckersBoard((0, 0), window.orginal_size, board).__enter__()))
+class Game(Drawable, AutomaticStack):
+    size = Placeholder[Size]((0,0))
+    def __init__(self, position: Inferable[Point], size: Size) -> None:
+        self.position = position
+        self.size = size
+
+        board = engine.Board(None, None, self._updateCurrentTeam)
+        self.board_info = BoardInfo(position, (size[0], size[1]//9), board.current_player)
+        self.board = CheckersBoard((self.position[0], self.position[1] + size[1]//9), (size[0], size[1] - size[1] // 9), board)
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.board_info.draw(window, scale)
+        self.board.draw(window, scale)
+    def reposition(self, position: Inferable[Point]) -> 'Game':
+        raise NotImplementedError()
+    
+    def _updateCurrentTeam(self, board: engine.Board) -> None:
+        self.board_info = self.board_info.changePlayer(board.current_player)
+    @stackEnabler
+    def enable(self, stack: ExitStack) -> None:
+        stack.enter_context(self.board)
+
+
+#window.startRenderer(30, drawableRenderer(CheckersBoard((0, 0), window.orginal_size, board).__enter__()))
+window.startRenderer(30, drawableRenderer(Game((0, 0), window.orginal_size).__enter__()))
 window.run()

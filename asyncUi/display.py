@@ -91,6 +91,11 @@ class Drawable(ABC):
 class Scale: 
     def __init__(self, scale: float) -> None:
         self.scale_factor = scale
+    @staticmethod
+    def difference(wanted: Size, current: Size) -> 'Scale':
+        if current[0] / current[1] != wanted[0] / wanted[1]:
+            raise ValueError("Aspect ratio must be equal")
+        return Scale(current[0] / wanted[0])
     def rect(self, rect: pygame.Rect) -> pygame.Rect:
         return pygame.Rect(*self.point((rect.x, rect.y)), *self.size((rect.width, rect.height)))
     def point(self, point: Point) -> Point:

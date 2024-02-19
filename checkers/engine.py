@@ -17,7 +17,7 @@ class Player(Enum):
     player1 = auto()
     player2 = auto()
 
-@dataclass
+@dataclass(eq=False)
 class Piece:
     owner: Player
     @abstractmethod
@@ -38,8 +38,8 @@ def addPoints(a: Point, b: Point) -> Point:
 def diagnal(start: Point, offset: Point) -> Iterable[Point]:
     i = 0
     while True:
-        i += 1
         yield (start[0] + offset[0] * i, start[1] + offset[1] * i)
+        i += 1
 @listify
 def take(ammount: int, values: Iterable[T]) -> Iterable[T]:
     for i, value in enumerate(values):
@@ -57,31 +57,33 @@ class Pawn(Piece):
     def validMoves(self, board: Board, position: Point) -> Iterable[Point]:
         flip = 1 if self.owner == Player.player2 else -1
         # Check corners
-        move_left = take(2, diagnal(position, (flip, flip)))
-        if board.onBoard(move_left[0]) and board[move_left[0]] is None:
-            yield move_left[0]
-        elif board.onBoard(move_left[1]) and (target:=board[move_left[0]]) is not None and target.owner != self.owner:
+        move_left = take(3, diagnal(position, (flip, flip)))
+        if board.onBoard(move_left[1]) and board[move_left[1]] is None:
             yield move_left[1]
+        elif board.onBoard(move_left[2]) and (target:=board[move_left[1]]) is not None and target.owner != self.owner:
+            yield move_left[2]
 
 
-        move_right = take(2, diagnal(position, (-flip, flip)))
-        if board.onBoard(move_right[0]) and board[move_right[0]] is None:
-            yield move_right[0]
-        elif board.onBoard(move_right[1]) and (target:=board[move_right[0]]) is not None and target.owner != self.owner:
+        move_right = take(3, diagnal(position, (-flip, flip)))
+        if board.onBoard(move_right[1]) and board[move_right[1]] is None:
             yield move_right[1]
+        elif board.onBoard(move_right[2]) and (target:=board[move_right[1]]) is not None and target.owner != self.owner:
+            yield move_right[2]
     def __str__(self) -> str:
         return 'pw'
     
     def captures(self, board: Board, move: Move) -> list[Piece]:
         flip = -1 if self.owner == Player.player2 else 1
         # Check corners
-        move_left = take(2, diagnal(move.target, (flip, flip)))
-        move_right = take(2, diagnal(move.target, (-flip, flip)))
+        move_left = take(3, diagnal(move.target, (flip, flip)))
+        move_right = take(3, diagnal(move.target, (-flip, flip)))
 
-        if move_left[1] == move.start:
-            return [assertNotNone(board[move_left[0]])]
-        if move_right[1] == move.start:
-            return [assertNotNone(board[move_right[0]])]
+        print(move_left)
+        print(move_right)
+        if move_left[2] == move.start:
+            return [assertNotNone(board[move_left[1]])]
+        if move_right[2] == move.start:
+            return [assertNotNone(board[move_right[1]])]
         return []
 
 @dataclass
@@ -102,11 +104,15 @@ class Board:
         self.on_player_change = player_change
         
         self.board_state: list[Piece | None] = list[Piece | None]([None]) * self.board_width* self.board_height
+        offset = 0
         for y in range(self.board_height):
+            offset =  y  % 2
             for x in range(self.board_width):
-                if x % 2 == 0:
-                    owner = engine
-
+                if x % 2 == offset:
+                    if y < self.board_height*(3/8):
+                        self[x, y] = Pawn(Player.player2)
+                    elif y > self.board_height*(3/8) + self.board_height*(2/8) - 1:
+                        self[x, y] = Pawn(Player.player1)
         
         self.current_player = Player.player1
         
@@ -126,7 +132,7 @@ class Board:
         if self.on_board_change is not None: 
             self.on_board_change(self)
     def onBoard(self, point: Point) -> bool:
-        return 0 <= point[0]  <= self.board_width and 0 <= point[1] <= self.board_height
+        return 0 <= point[0]  < self.board_width and 0 <= point[1] < self.board_height
 
     def nextMove(self) -> None:
         players = [Player.player1, Player.player2]

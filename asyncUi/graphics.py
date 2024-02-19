@@ -365,15 +365,15 @@ class InputBox(Drawable, AutomaticStack):
 def addPoint(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
     return a[0] + b[0], a[1] + b[1]
 class Polygon(Drawable):
-    def __init__(self, position: Inferable[Point], color: Color, points: Sequence[Point]) -> None:
+    def __init__(self, position: Inferable[Point], color: Color, points: Sequence[Point], thickness: int = 0) -> None:
         self.position = position
         self.color = color
         self.points = points
-
+        self.thickness = thickness
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.polygon(window, self.color, [scale.point(point) for point in self.absolutePoints])
+        pygame.draw.polygon(window, self.color, [scale.point(point) for point in self.absolutePoints], scale.length(self.thickness))
 
     @cachedProperty[list[Point]]
     def absolutePoints(self) -> list[Point]:
@@ -402,7 +402,14 @@ class Line(Drawable):
         self.thickness = thickness
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.line(window, self.color, scale.point(addPoint(self.start, self.position)), scale.point(addPoint(self.end, self.position)), int(self.thickness*scale.scale_factor))
+        line_offset = (-self.thickness//2, 0)
+        pygame.draw.line(
+            window, 
+            self.color, 
+            scale.point(addPoint(addPoint(self.start, self.position), line_offset)), 
+            scale.point(addPoint(addPoint(self.end, self.position), line_offset)), 
+            int(self.thickness*scale.scale_factor)
+            )
 
     def reposition(self, position: Inferable[Point]) -> 'Line':
         return Line(position, self.color, self.thickness, self.start, self.end)
