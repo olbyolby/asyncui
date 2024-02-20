@@ -1,14 +1,14 @@
 # ruff: noqa
 from __future__ import annotations
-from typing import TypeVar, TypeVarTuple, Generic, Callable, Sequence, Iterable, Generator, no_type_check, Any, overload, Union, Protocol, cast
+from typing import ParamSpec, TypeVar, TypeVarTuple, Generic, Callable, Sequence, Iterable, Generator, no_type_check, Any, overload, Union, Protocol, cast
 from types import EllipsisType
-
+from functools import wraps
 
 
 T = TypeVar('T')
 T2 = TypeVar('T2')
 Ts = TypeVarTuple('Ts')
-T2s = TypeVarTuple('T2s')
+P = ParamSpec('P')
 
 def valueIndex(data: Iterable[T | T2], value: T2) -> Generator[int, None, None]:
     for i, dataValue in enumerate(data):
@@ -30,8 +30,6 @@ class PartialCall(Generic[T]):
         else:
             return self.function(*filledArgs)
 
-
-PartialCall(print, ..., ..., ..., 4, ...)(..., 2, ..., 5)(1, 3)
 
 class BoundClassInstanceMethod(Generic[T, *Ts, T2]):
     def __init__(self, cls: type[T], instance: T, function: Callable[[type[T], T, *Ts], T2]) -> None:
@@ -283,17 +281,28 @@ class Constructor(Generic[T, *Ts]):
             return new_object
         return wrapper
     
-
-def statefulFunction(function: Callable[[*Ts], Generator[T, tuple[*T2s], Never]]) -> Callable[[*Ts], Callable[[*T2s], T]]:
-    @wraps(function)
-    def wrapper(*args: *Ts) -> Callable[[*T2s], T]:
-        state = function(*args)
-        # Prime the generator
-        next(state)
-        
-        def sender(*args: *T2s) -> T:
-            return state.send(args)
-        return sender
-    return wrapper
         
     
+
+def trampoline(function: Callable[P, Generator[Callable[..., Any], Any, T]]) -> Callable[P, T]:
+    @wraps(function)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        generator = function(*args, **kwargs)
+        try: 
+            continuation = next(generator)
+            while True:
+                continuation = generator.send(continuation())
+        except StopIteration as e:
+            return cast(T, e.value)
+    return wrapper
+@trampoline
+def test(*values: int) -> Generator[Any, Any, int]:
+    total = 0
+    for value in values:
+        yield lambda: print(value)
+        total = yield lambda: total + value
+    return total
+
+print(test(1,2,3,4,5,6))
+
+

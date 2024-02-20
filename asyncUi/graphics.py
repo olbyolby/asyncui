@@ -8,6 +8,7 @@ from .resources.fonts import Font
 from contextlib import ExitStack
 from .import events
 from .window import eventHandlerMethod, Window
+from .utils import coroutines
 import pygame
 
 
@@ -418,61 +419,20 @@ class Line(Drawable):
         return Line(self.position, self.color, self.thickness, self.start if start is ... else start, self.end if end is ... else end)
 
 class Group(Drawable, AutomaticStack):
-    
-    def __init__(self, position: Inferable[Point], widgets: Sequence[Drawable]) -> None:
+    def __init__(self, position: Inferable[Point], factory: Callable[[Drawable], Drawable], widgets: Sequence[Drawable]) -> None:
         self.position = position
-  
-        if position is not ...:
-            
-            self._widgets: Sequence[Drawable] = self._positioner(widgets)
-        else:
-            self._widgets = widgets
-    @listify
-    def _positioner(self, widgets: Sequence[Drawable]) -> Iterable[Drawable]:
-        yield from widgets
-
+        self.factory = factory
+        self.widgets = [factory(widget.reposition(self.position)) for widget in widgets]
     def draw(self, window: pygame.Surface, scale: float) -> None:
-        for widget in self._widgets:
+        for widget in self.widgets:
             widget.draw(window, scale)
-    
-    def reposition(self, position: Point | EllipsisType) -> Self:
-        return type(self)(position, self._widgets)
-    
-    @staticmethod
-    def _boundingRect(rects: Iterable[pygame.Rect]) -> pygame.Rect:
-        minX, minY, maxH, maxW = 0, 0, 0, 0
-        for rect in rects:
-            minX = min(minX, rect.x)
-            minY = min(minY, rect.y)
-            maxH = max(maxH, rect.height)
-            maxW = max(maxW, rect.width)
-        return pygame.Rect(minX, minY, maxW, maxH)
-    
-    @cachedProperty[pygame.Rect]
-    def body(self) -> pygame.Rect:
-        return self._boundingRect((widget.body for widget in self._widgets))
-    
-    def appendWidgets(self, widgets: Iterable[Drawable]) -> Self:
-        widgets = list(widgets)
-        return type(self)(self.position, list(self._widgets)+widgets)
-    
-    def getSize(self) -> Size:
-        return self.body.width, self.body.height
-    size = cachedProperty[Size](getSize)
-
+    def reposition(self, position: Inferable[Point]) -> 'Group':
+        return Group(position, self.factory, self.widgets)
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
-        for widget in self._widgets:
+        for widget in self.widgets:
             if isinstance(widget, AutomaticStack):
                 stack.enter_context(widget)
-
-class HorizontalGroup(Group):
-    @listify
-    def _positioner(self, widgets: Sequence[Drawable]) -> Iterable[Drawable]:
-        x_offset = self.position[0]
-        for widget in widgets:
-            yield widget.reposition((x_offset, self.position[1]))
-            x_offset += widget.body.width
 
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
@@ -480,29 +440,6 @@ def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
     outter_center = (outter.position[0] + (outter.size[0]//2), outter.position[1] + (outter.size[1]//2))
     inner_position = (outter_center[0] - inner.size[0]//2, outter_center[1] - inner.size[1]//2)
     return inner.reposition(inner_position)
-
-class VirticalGroup(Group):
-    @listify
-    def _positioner(self, widgets: Sequence[Drawable]) -> Iterable[Drawable]:
-        y_offset = self.position[1]
-        for widget in widgets:
-            yield widget.reposition((self.position[0], y_offset))
-            y_offset += widget.body.height
-
-
-class ConcentricGroup(Group):
-    @listify
-    def _positioner(self, widgets: Sequence[Drawable]) -> Iterable[Drawable]:
-        max_size_x = 0
-        max_size_y = 0
-        for widget in widgets:
-            max_size_x = max(widget.size[0], max_size_x)
-            max_size_y = max(widget.size[1], max_size_y)
-
-
-        for widget in widgets:
-            corner = (max_size_x - widget.size[0] + self.position[0], max_size_y - widget.size[1] + self.position[1])
-            yield widget.reposition(corner)
     
 class Circle(Drawable):
     def __init__(self, position: Inferable[Point], color: Color, radius: int, thickness: int = 0) -> None:
@@ -576,3 +513,17 @@ class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
 
     def reposition(self, position: Inferable[Point]) -> 'MenuWindow[DrawableT]':
         return MenuWindow(position, self.size, self.background.color, self.title, self.close, self.screen)
+
+
+
+
+
+# Some useful positioner functions
+@coroutines.statefulFunction
+def horizontalAligned() -> coroutines.Stateful[Drawable, Drawable]:
+    widget, = yield coroutines.SkipState
+    x_offset = widget.size[0]
+    while True:
+        new_widget, = yield widget
+        x_offset += widget.size[0]
+        widget = new_widget.reposition(addPoint(new_widget.position, (widget.size[0], 0)))
