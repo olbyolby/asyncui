@@ -83,7 +83,7 @@ class Drawable(ABC):
     def reposition(self, position: Point | EllipsisType, /) -> Self:
         ...
 
-    position: Placeholder[Point] = Placeholder[Point]((0, 0))
+    position = Placeholder[Point]((0, 0))
     size: cachedProperty[Size] | Placeholder[Size]
 
     body: cachedProperty[Rect] = cachedProperty[Rect](lambda s: Rect(s.position, s.size))

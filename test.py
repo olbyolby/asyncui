@@ -1,6 +1,6 @@
 from asyncUi.window import eventHandler, Window
 from asyncUi.display import drawableRenderer, Color
-from asyncUi.graphics import ConcentricGroup, Circle, Text, Group
+from asyncUi.graphics import Circle, Text, Group
 from asyncUi.resources import fonts
 from asyncUi import events
 from typing import Never

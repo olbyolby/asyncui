@@ -5,11 +5,11 @@ from functools import wraps
 
 
 import asyncio
+__all__ = ('Placeholder')
 
 T = TypeVar('T')
 T2 = TypeVar('T2')
 
-__all__ = ('Placeholder')
 
 class Placeholder(Generic[T]):
     def __init__(self, default: T, name: str | None = None):
