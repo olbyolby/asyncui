@@ -7,6 +7,7 @@ from functools import wraps
 
 T = TypeVar('T')
 T2 = TypeVar('T2')
+T3 = TypeVar('T3')
 Ts = TypeVarTuple('Ts')
 P = ParamSpec('P')
 
@@ -303,6 +304,58 @@ def test(*values: int) -> Generator[Any, Any, int]:
         total = yield lambda: total + value
     return total
 
-print(test(1,2,3,4,5,6))
+class ListMaker():
+    def __rmatmul__(self, other: Iterable[T]) -> list[T]:
+        return list(other)
+listify = ListMaker()
+class Apply:
+    class wrapper(Generic[T, T2]):
+        def __init__(self, function: Callable[[T], T2]) -> None:
+            self.function = function
+        def __rshift__(self, data: Iterable[T]) -> Iterable[T2]:
+            for value in data:
+                yield self.function(value)
+    def __matmul__(self, function: Callable[[T], T2]) -> Apply.wrapper[T, T2]:
+        return self.wrapper(function)
+apply = Apply()
+class log:
+    def __init__(self, message: str) -> None:
+        print(message)
+    def __rand__(self, value: T) -> T:
+        return value
 
 
+def addOne(x: int) -> int:
+    return x + 1
+
+#print((apply @ addOne >> [1,2,3]) @ listify)
+
+
+class Test:
+    def __add__(self, other: int) -> int:
+        return other + 4
+
+test2 =  Test()
+print(test2 + 4)
+
+class Transformer(Generic[T, T2]):
+    def __init__(self, transformer: Callable[[T], T2]) -> None:
+        self.transformer = transformer
+
+    def __call__(self, value: T) -> T2:
+        return self.transformer(value)
+    __rrshift__ = __call__
+
+    def __matmul__(self, data: Iterable[T]) -> Iterable[T2]:
+        if not isinstance(data, Iterable):
+            return NotImplemented
+        for value in data:
+            yield self(value)
+    
+    def __and__(self, function: Callable[[T2], T3]) -> Transformer[T, T3]:
+        return Transformer(lambda x: function(self(x)))
+    __rmatmul__ = __and__
+
+asTuples = Transformer[int, tuple[int]](lambda x: (x,))
+squred = Transformer[int, int](lambda x: x*x)
+print(list((squred & asTuples) @ [1,2,3,4]))

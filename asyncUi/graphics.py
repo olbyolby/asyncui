@@ -1,6 +1,6 @@
 from __future__ import annotations
 from types import EllipsisType
-from .util import Placeholder, Inferable, CallbackWrapper, Callback, MutableContextManager
+from .util import Placeholder, Inferable, CallbackWrapper, Callback
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler, widgetRenderer
 from typing import TypeVar, Iterable, Final, Callable, Sequence, Generic
 from functools import cached_property as cachedProperty
@@ -512,58 +512,6 @@ class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
     def reposition(self, position: Inferable[Point]) -> 'MenuWindow[DrawableT]':
         return MenuWindow(position, self.size, self.background.color, self.title, self.close, self.screen)
 
-class CollapseableMenu(Drawable, AutomaticStack):
-    size = Placeholder[Size]((0,0))
-    def __init__(self, position: Inferable[Point], title: Drawable, options: Iterable[Drawable], open: bool):
-        self.position = position
-
-        stack = verticalAligned()
-        self.title = stack(title.reposition(self.position))
-        self.options = list(coroutines.feed(stack, coroutines.feed(overlap(), options)))
-        self.title_button = Clickable(self.title.position, self.title.size, self._on_click)
-        self._option_stack: MutableContextManager[ExitStack] = MutableContextManager()
-        self.open = open
-
-
-        self.size = (
-            max((widget.size[0] for widget in options), default=0), # Find the logest option
-            sum((widget.size[1] for widget in options)) # Find the total of all lengths
-        )
-
-    def _on_click(self, e: events.MouseButtonUp) -> None:
-        self.open = not self.open
-    
-    @property
-    def open(self) -> bool:
-        return self._open
-    @open.setter
-    def open(self, value: bool) -> None:
-        self._open = value
-        if value is False:
-            self._option_stack.clear()
-        else:
-            with ExitStack() as stack:
-                for option in self.options:
-                    if isinstance(option, AutomaticStack):
-                        stack.enter_context(option)
-                self._option_stack.changeContext(stack.pop_all())
-
-
-    @widgetRenderer
-    def draw(self) -> Iterable[Drawable]:
-        yield self.title
-        if self.open:
-            yield from self.options
-    
-    @stackEnabler
-    def enable(self, stack: ExitStack) -> None:
-        stack.enter_context(self.title_button)
-        if isinstance(self.title, AutomaticStack):
-            stack.enter_context(self.title)
-        stack.enter_context(self._option_stack)
-
-    def reposition(self, position: Inferable[Point]) -> 'CollapseableMenu':
-        return CollapseableMenu(position, self.title, self.options, self.open)
 
 
 # Some useful positioner functions

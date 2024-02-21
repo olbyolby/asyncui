@@ -1,4 +1,5 @@
-from typing import ParamSpec, Literal, TypeVar, Generator, TypeVarTuple, Callable, Never, Sequence, Iterable
+from __future__ import annotations
+from typing import ParamSpec, Literal, TypeVar, Generator, TypeVarTuple, Callable, Never, Iterable, Generic, overload
 from functools import wraps
 from enum import Enum, auto
 
@@ -12,6 +13,7 @@ class Sentinals(Enum):
     SkipState = auto()
 SkipState = Sentinals.SkipState
 
+Stateful = Generator[T | Literal[Sentinals.SkipState], tuple[*Ts], Never]
 def statefulFunction(function: Callable[P, Generator[T | Literal[Sentinals.SkipState], tuple[*Ts], Never]]) -> Callable[P, Callable[[*Ts], T]]:
     @wraps(function)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> Callable[[*Ts], T]:
@@ -29,15 +31,16 @@ def statefulFunction(function: Callable[P, Generator[T | Literal[Sentinals.SkipS
 
         return sender
     return wrapper
-Stateful = Generator[T | Literal[Sentinals.SkipState], tuple[*Ts], Never]
+
 
 def feed(coroutine: Callable[[T], T2], values: Iterable[T]) -> Iterable[T2]:
     for value in values:
         yield coroutine(value)
 
 
+
 @statefulFunction
 def accumulate(value: int) -> Stateful[int, int]:
-    yield SkipState
+    next_value, = yield SkipState
     while True:
-        value = value + (yield value)[0]
+        next_value, value = (yield value)[0], value + next_value
