@@ -539,3 +539,9 @@ def verticalAligned() -> coroutines.Stateful[Drawable, Drawable]:
     y_offset = coroutines.accumulate(widget.position[1])
     while True:
         widget, = yield widget.reposition((widget.position[0], y_offset(widget.size[1])))
+
+@coroutines.statefulFunction
+def concentric() -> coroutines.Stateful[Drawable, Drawable]:
+    widget, = base, =  yield coroutines.SkipState
+    while True:
+        widget, = yield centered(base, widget)
