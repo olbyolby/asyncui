@@ -258,7 +258,7 @@ class Game(Drawable, AutomaticStack):
         self.position = position
         self.size = size
 
-        board = engine.Board(None, None, self._updateCurrentTeam)
+        board = engine.Board(None, self.on_win, self._updateCurrentTeam)
         self.board_info = BoardInfo(position, (size[0], size[1]//9), board.current_player)
         self.board = CheckersBoard((self.position[0], self.position[1] + size[1]//9), (size[0], size[1] - size[1] // 9), board, lambda x: self.make_pop_up("Illegal move", x))
         self.pop_up = MutableContextManager[Any]()
@@ -268,6 +268,9 @@ class Game(Drawable, AutomaticStack):
         if pop_up:=self.pop_up.context:
             pop_up.draw(window, scale)
 
+    def on_win(self, board: engine.Board, winner: engine.Player) -> None:
+        self.make_pop_up("Game over", f"{self._players_to_names[winner]} won!")
+        self.pop_up.context.disable() #type: ignore
 
     def make_pop_up(self, title: str, msg: str) -> None:
         self.board.disable()
@@ -296,6 +299,11 @@ class Game(Drawable, AutomaticStack):
         engine.Player.player2: "Black", 
     }
 
-#window.startRenderer(30, drawableRenderer(CheckersBoard((0, 0), window.orginal_size, board).__enter__()))
-window.startRenderer(30, drawableRenderer(Game((0, 0), window.orginal_size).__enter__()))
-window.run()
+import code
+import threading
+repl = threading.Thread(target=code.InteractiveConsole(globals()).interact)
+repl.start()
+with Game((0, 0), window.orginal_size) as game:
+    window.startRenderer(30, drawableRenderer(game))
+    window.run()
+repl.join()
