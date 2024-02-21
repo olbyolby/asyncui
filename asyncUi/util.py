@@ -136,6 +136,10 @@ class MutableContextManager(Generic[ContextT]):
         if self.context is not None:
             self.context.__exit__(None, None, None)
             self.context = None
+
+    def cleared(self) -> bool:
+        return self.context is None
+    __bool__ = cleared
     
     def __enter__(self) -> Self:
         return self

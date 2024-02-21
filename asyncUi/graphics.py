@@ -1,8 +1,8 @@
 from __future__ import annotations
 from types import EllipsisType
-from .util import Placeholder, Inferable, listify, CallbackWrapper, Callback
+from .util import Placeholder, Inferable, CallbackWrapper, Callback
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler
-from typing import TypeVar, Iterable, Final, Self, Callable, Sequence, Generic
+from typing import TypeVar, Iterable, Final, Callable, Sequence, Generic
 from functools import cached_property as cachedProperty
 from .resources.fonts import Font
 from contextlib import ExitStack
@@ -419,20 +419,27 @@ class Line(Drawable):
         return Line(self.position, self.color, self.thickness, self.start if start is ... else start, self.end if end is ... else end)
 
 class Group(Drawable, AutomaticStack):
-    def __init__(self, position: Inferable[Point], factory: Callable[[Drawable], Drawable], widgets: Sequence[Drawable]) -> None:
+    def __init__(self, position: Inferable[Point], widgets: Iterable[Drawable]) -> None:
         self.position = position
-        self.factory = factory
-        self.widgets = [factory(widget.reposition(self.position)) for widget in widgets]
+        self.widgets = [widget.reposition(addPoint(self.position,widget.position)) for widget in widgets]
     def draw(self, window: pygame.Surface, scale: float) -> None:
         for widget in self.widgets:
             widget.draw(window, scale)
     def reposition(self, position: Inferable[Point]) -> 'Group':
-        return Group(position, self.factory, self.widgets)
+        return Group(position, (widget.reposition((widget.position[0] - self.position[0], widget.position[1] - self.position[1])) for widget in self.widgets))
     @stackEnabler
     def enable(self, stack: ExitStack) -> None:
         for widget in self.widgets:
             if isinstance(widget, AutomaticStack):
                 stack.enter_context(widget)
+
+    def getSize(self) -> Size:
+        max_x = max_y = 0
+        for widget in self.widgets:
+            max_x = max(widget.position[0] + widget.size[0], max_x)
+            max_y = max(widget.position[1] + widget.size[1], max_y)
+        return max_x - self.position[0], max_y - self.position[1]
+    size = cachedProperty(getSize)
 
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
@@ -522,8 +529,13 @@ class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
 @coroutines.statefulFunction
 def horizontalAligned() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
-    x_offset = widget.size[0]
+    x_offset = coroutines.accumulate(widget.position[0])
     while True:
-        new_widget, = yield widget
-        x_offset += widget.size[0]
-        widget = new_widget.reposition(addPoint(new_widget.position, (widget.size[0], 0)))
+        widget, = yield widget.reposition((x_offset(widget.size[0]),widget.position[1]))
+
+@coroutines.statefulFunction
+def verticalAligned() -> coroutines.Stateful[Drawable, Drawable]:
+    widget, = yield coroutines.SkipState
+    y_offset = coroutines.accumulate(widget.position[1])
+    while True:
+        widget, = yield widget.reposition((widget.position[0], y_offset(widget.size[1])))

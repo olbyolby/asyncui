@@ -1,7 +1,7 @@
 from typing import ParamSpec, Literal, TypeVar, Generator, TypeVarTuple, Callable, Never, Sequence, Iterable
 from functools import wraps
 from enum import Enum, auto
-from numbers import Real
+
 T = TypeVar('T')
 T2 = TypeVar('T2')
 T3 = TypeVar('T3')
@@ -18,7 +18,8 @@ def statefulFunction(function: Callable[P, Generator[T | Literal[Sentinals.SkipS
         generator = function(*args, **kwargs)
 
         # Prime the generator
-        next(generator)
+        if next(generator) is not SkipState:
+            raise ValueError("stateful function must yield SkipState on it's first iteration!")
         
         def sender(*args: *Ts) -> T:
             result = generator.send(args)
@@ -34,8 +35,9 @@ def feed(coroutine: Callable[[T], T2], values: Sequence[T]) -> Iterable[T2]:
     for value in values:
         yield coroutine(value)
 
-NumT = TypeVar("NumT", bound=complex)
+
 @statefulFunction
-def accumulate(value: NumT) -> Stateful[NumT, NumT]:
+def accumulate(value: int) -> Stateful[int, int]:
+    yield SkipState
     while True:
-        value += (yield value)[0]
+        value = value + (yield value)[0]
