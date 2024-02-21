@@ -1,6 +1,6 @@
 from asyncUi.window import eventHandler, Window
 from asyncUi.display import drawableRenderer, Color
-from asyncUi.graphics import Circle, Text, Group
+from asyncUi.graphics import Circle, Text, Group, CollapseableMenu
 from asyncUi.resources import fonts
 from asyncUi import events
 from typing import Never
@@ -16,7 +16,12 @@ exiter.register()
 
 CIRCLE_COUNT = 100
 RED = Color(255, 0, 0)
+arial = fonts.fontManager.loadSystemFont('arial')
 
-
-#window.startRenderer(10, drawableRenderer(app))
+app = CollapseableMenu((0, 0), Text(..., arial, 16, Color.WHITE, "Options"), [
+    Text(..., arial, 16, Color.WHITE, "Option 1"),
+    Text(..., arial, 16, Color.WHITE, "Option 2"),
+    Text(..., arial, 16, Color.WHITE, "Option 3"),
+], False)
+window.startRenderer(10, drawableRenderer(app.__enter__()))
 window.run()

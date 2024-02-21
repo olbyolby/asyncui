@@ -114,9 +114,9 @@ def listify(function: Callable[[*Ts], Iterable[T]]) -> Callable[[*Ts], list[T]]:
 
 
 class ContextHandler(Protocol):
-    def __enter__(self) -> Self:
+    def __enter__(self) -> Any:
         ...
-    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /) -> bool | None:
         ...
 ContextT = TypeVar('ContextT', bound=ContextHandler)
 

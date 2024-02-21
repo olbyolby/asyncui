@@ -165,6 +165,14 @@ def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[
         return function(self, window, Scale(scale))
     return wrapper
 
+def widgetRenderer(function: Callable[[T], Iterable[Drawable]]) -> Callable[[T, pygame.Surface, float], None]:
+    @wraps(function)
+    def wrapper(self: T, window: pygame.Surface, scale: float) -> None:
+        for drawable in function(self):
+            drawable.draw(window, scale)
+    return wrapper
+
+
 DrawableT = TypeVar('DrawableT', bound=Drawable)
 def rescaler(function: Callable[[T, Scale], T]) -> Callable[[T, float], T]:
     @wraps(function)

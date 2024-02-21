@@ -31,7 +31,7 @@ def statefulFunction(function: Callable[P, Generator[T | Literal[Sentinals.SkipS
     return wrapper
 Stateful = Generator[T | Literal[Sentinals.SkipState], tuple[*Ts], Never]
 
-def feed(coroutine: Callable[[T], T2], values: Sequence[T]) -> Iterable[T2]:
+def feed(coroutine: Callable[[T], T2], values: Iterable[T]) -> Iterable[T2]:
     for value in values:
         yield coroutine(value)
 
