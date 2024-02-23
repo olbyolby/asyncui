@@ -8,7 +8,7 @@ from .resources.fonts import Font
 from contextlib import ExitStack
 from .import events
 from .window import eventHandlerMethod, Window
-from .utils import coroutines
+from .utils import coroutines, transformers
 import pygame
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
@@ -521,11 +521,13 @@ def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
     inner_position = (outter_center[0] - inner.size[0]//2, outter_center[1] - inner.size[1]//2)
     return inner.reposition(inner_position)    
 
+@transformers.transformerFactory
 @coroutines.statefulFunction
 def overlap() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = base, = yield coroutines.SkipState
     while True:
         widget, = yield widget.reposition(base.position)
+@transformers.transformerFactory
 @coroutines.statefulFunction
 def horizontalAligned() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
@@ -533,6 +535,7 @@ def horizontalAligned() -> coroutines.Stateful[Drawable, Drawable]:
     while True:
         widget, = yield widget.reposition((x_offset(widget.size[0]),widget.position[1]))
 
+@transformers.transformerFactory
 @coroutines.statefulFunction
 def verticalAligned() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
@@ -540,6 +543,7 @@ def verticalAligned() -> coroutines.Stateful[Drawable, Drawable]:
     while True:
         widget, = yield widget.reposition((widget.position[0], y_offset(widget.size[1])))
 
+@transformers.transformerFactory
 @coroutines.statefulFunction
 def concentric() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = base, =  yield coroutines.SkipState

@@ -32,8 +32,8 @@ class BoardBackground(Drawable, AutomaticStack):
         self.on_square_press = CallbackWrapper(on_square_press)        
 
         self.box_size = (size[0] // grid_size[0], size[1] // grid_size[1])
-        self.rows = Group(self.position, coroutines.feed(verticalAligned(), [
-                Group(..., coroutines.feed(horizontalAligned(), [Box(..., self.box_size, [Color.WHITE, Color.BLACK][((column + row % 2) % 2)]) for column in range(grid_size[0])]))
+        self.rows = Group(self.position, list(verticalAligned() @ [
+                Group(..., horizontalAligned() @ [Box(..., self.box_size, [Color.WHITE, Color.BLACK][((column + row % 2) % 2)]) for column in range(grid_size[0])])
                 for row in range(grid_size[1])
             ]))
 
@@ -299,11 +299,7 @@ class Game(Drawable, AutomaticStack):
         engine.Player.player2: "Black", 
     }
 
-import code
-import threading
-repl = threading.Thread(target=code.InteractiveConsole(globals()).interact)
-repl.start()
+
 with Game((0, 0), window.orginal_size) as game:
     window.startRenderer(30, drawableRenderer(game))
     window.run()
-repl.join()

@@ -304,10 +304,10 @@ def test(*values: int) -> Generator[Any, Any, int]:
         total = yield lambda: total + value
     return total
 
-class ListMaker():
+class ListifyType():
     def __rmatmul__(self, other: Iterable[T]) -> list[T]:
         return list(other)
-listify = ListMaker()
+listify = ListifyType()
 class Apply:
     class wrapper(Generic[T, T2]):
         def __init__(self, function: Callable[[T], T2]) -> None:
@@ -318,11 +318,6 @@ class Apply:
     def __matmul__(self, function: Callable[[T], T2]) -> Apply.wrapper[T, T2]:
         return self.wrapper(function)
 apply = Apply()
-class log:
-    def __init__(self, message: str) -> None:
-        print(message)
-    def __rand__(self, value: T) -> T:
-        return value
 
 
 def addOne(x: int) -> int:
@@ -352,10 +347,17 @@ class Transformer(Generic[T, T2]):
         for value in data:
             yield self(value)
     
-    def __and__(self, function: Callable[[T2], T3]) -> Transformer[T, T3]:
-        return Transformer(lambda x: function(self(x)))
+    @overload
+    def __and__(self, function: Callable[[T3], T],/) -> Transformer[T3, T2]: ...
+    @overload
+    def __and__(self, data: Iterable[T]) -> Iterable[T2]:  ...
+
+    def __and__(self, function: Callable[[T3], T] | Iterable[T]) -> Iterable[T2] | Transformer[T3, T2]: 
+        if callable(function):
+            return Transformer(lambda x: self(function(x)))
+        return self @ function
     __rmatmul__ = __and__
 
 asTuples = Transformer[int, tuple[int]](lambda x: (x,))
 squred = Transformer[int, int](lambda x: x*x)
-print(list((squred & asTuples) @ [1,2,3,4]))
+print(list(squred & asTuples @ [1,2,3,4]))
