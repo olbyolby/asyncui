@@ -300,22 +300,20 @@ class InputBox(Drawable, AutomaticStack):
         - Scrolling when text is too long
     
     """
-    def __init__(self, textBox: InputBoxDisplay, on_enter: Callback[str], on_change: Callback[str], input_validater: Callable[[str], bool] = lambda s: True) -> None:
-        self.position = textBox.position
-        self.__textBox = textBox.change_cursor_shown(False)
+    def __init__(self, text_box: InputBoxDisplay, on_enter: Callback[str], on_change: Callback[str], input_validater: Callable[[str], bool] = lambda s: True, focused: bool = False) -> None:
+        self.position = text_box.position
+        self.__textBox = text_box.change_cursor_shown(False)
         self.on_enter = CallbackWrapper(on_enter)
         self.on_change = CallbackWrapper(on_change)
         self.input_validater = input_validater
 
-        self._focused = False
-        self._focuser = Focusable(textBox.position, textBox.size, self._on_focus, self._on_unfocus)
+        self._focused = focused
+        self._focuser = Focusable(text_box.position, text_box.size, self._on_focus, self._on_unfocus)
     
     def draw(self, window: pygame.Surface, scale: float) -> None:
         self.text_box.draw(window, scale)
     def reposition(self, position: Point | EllipsisType) -> 'InputBox':
-        return InputBox(self.text_box.reposition(position), self.on_enter, self.on_change)
-    def rescale(self, factor: float) -> 'InputBox':
-        return InputBox(self.text_box.rescale(factor), self.on_enter, self.on_change)
+        return InputBox(self.text_box.reposition(position), self.on_enter, self.on_change, self.input_validater, self._focused)
 
     
     def get_size(self) -> Size:
@@ -375,10 +373,10 @@ class Polygon(Drawable):
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.polygon(window, self.color, [scale.point(point) for point in self.absolutePoints], scale.length(self.thickness))
+        pygame.draw.polygon(window, self.color, [scale.point(point) for point in self.absolute_points], scale.length(self.thickness))
 
     @cached_property[list[Point]]
-    def absolutePoints(self) -> list[Point]:
+    def absolute_points(self) -> list[Point]:
         return [add_point(self.position, point) for point in self.points]
     
     
@@ -530,7 +528,7 @@ def overlap() -> coroutines.Stateful[Drawable, Drawable]:
         widget, = yield widget.reposition(base.position)
 @transformers.transformerFactory
 @coroutines.statefulFunction
-def horizontal_aligned() -> coroutines.Stateful[Drawable, Drawable]:
+def horizontal() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
     x_offset = coroutines.accumulate(widget.position[0])
     while True:
@@ -538,7 +536,7 @@ def horizontal_aligned() -> coroutines.Stateful[Drawable, Drawable]:
 
 @transformers.transformerFactory
 @coroutines.statefulFunction
-def vertical_aligned() -> coroutines.Stateful[Drawable, Drawable]:
+def vertical() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
     y_offset = coroutines.accumulate(widget.position[1])
     while True:
@@ -550,3 +548,4 @@ def concentric() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = base, =  yield coroutines.SkipState
     while True:
         widget, = yield centered(base, widget)
+
