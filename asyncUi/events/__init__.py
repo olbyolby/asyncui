@@ -108,7 +108,7 @@ class Event:
         super().__init_subclass__(**kwargs)
 
 
-def toPygameEvent(event: Event | pygame.event.Event) -> pygame.event.Event:
+def to_pygame_event(event: Event | pygame.event.Event) -> pygame.event.Event:
     """Convert an asyncUi event to a pygame event"""
     if isinstance(event, pygame.event.Event):
         return event

@@ -6,15 +6,15 @@ class FontSizeManager:
         self.font_loader = font_loader
         self.font_name = font_name
         self.loaded_fonts = dict[int, pygame.font.Font]()
-    def withSize(self, fontSize: int) -> pygame.font.Font:
+    def with_size(self, fontSize: int) -> pygame.font.Font:
         if fontSize in self.loaded_fonts:
             return self.loaded_fonts[fontSize]
         
-        newFont = self.font_loader(self.font_name, fontSize)
-        self.loaded_fonts[fontSize] = newFont
-        return newFont
+        new_font = self.font_loader(self.font_name, fontSize)
+        self.loaded_fonts[fontSize] = new_font
+        return new_font
     def __getitem__(self, key: int) -> pygame.font.Font:
-        return self.withSize(key)
+        return self.with_size(key)
     def __delitem__(self, key: int) -> None:
         del self.loaded_fonts[key]
 
@@ -25,12 +25,12 @@ class FontManager:
         self.default_loader = default_loader
         self.loaded_fonts = dict[str, FontSizeManager]()
 
-    def loadLocalFont(self, font_name: str) -> FontSizeManager: 
+    def load_local_font(self, font_name: str) -> FontSizeManager: 
         if font_name not in self.loaded_fonts:
             self.loaded_fonts[font_name] = FontSizeManager(font_name, pygame.font.Font)
         return self.loaded_fonts[font_name]
         
-    def loadSystemFont(self, fontName: str) -> FontSizeManager:
+    def load_system_font(self, fontName: str) -> FontSizeManager:
         if fontName not in self.loaded_fonts:
             self.loaded_fonts[fontName] = FontSizeManager(fontName, pygame.font.SysFont)
         return self.loaded_fonts[fontName]
@@ -41,6 +41,6 @@ class FontManager:
         return self.loaded_fonts[fontName]
     def __delitem__(self, fontName: str) -> None:
         del self.loaded_fonts[fontName]
-fontManager = FontManager(pygame.font.Font)
+font_manager = FontManager(pygame.font.Font)
 
 Font = FontSizeManager

@@ -59,14 +59,14 @@ class EventHandler(Generic[EventT]):
     def register(self) -> None:
         if self.registered: 
             return
-        Window().registerEventHandler(self.event_type, self.function)
+        Window().register_event_handler(self.event_type, self.function)
     def unregister(self) -> None:
         if not self.registered: 
             return
-        Window().unregisterEventHandler(self.event_type, self.function)
+        Window().unregister_event_handler(self.event_type, self.function)
     @property
     def registered(self) -> bool:
-        return Window().isEventHandlerRegistered(self.event_type, self.function)    
+        return Window().is_event_handler_registered(self.event_type, self.function)    
     
     def __enter__(self) -> Self:
         self.register()
@@ -266,7 +266,7 @@ class TimerList:
         for timer in self.timers:
             if timer.when() - Window().time() <= 0:
                 deadTimers.append(timer)
-                Window().postEvent(ExecuteCallbackEvent(timer))
+                Window().post_event(ExecuteCallbackEvent(timer))
         for timer in deadTimers:
             self.timers.remove(timer)
     def cancel(self, timer: asyncio.TimerHandle) -> None:
@@ -378,8 +378,8 @@ class Window(asyncio.AbstractEventLoop):
         self.renderer: Renderer | None = None
         self.default_executor: Executor = ThreadPoolExecutor(5)
 
-        self.registerEventHandler(ExecuteCallbackEvent, self._run_exacute_callback)
-        self.registerEventHandler(events.VideoResize, self._resizeHandler)
+        self.register_event_handler(ExecuteCallbackEvent, self._run_exacute_callback)
+        self.register_event_handler(events.VideoResize, self._resize_handler)
 
         self.closed= False
         self.running = False
@@ -390,7 +390,7 @@ class Window(asyncio.AbstractEventLoop):
 
     
     #Event handler processing
-    def registerEventHandler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
+    def register_event_handler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
         logger.debug(f"Registered event handler {handler!r} for event type {eventType.__qualname__!r}")
         """
         Register an event handler for a given event type
@@ -401,7 +401,7 @@ class Window(asyncio.AbstractEventLoop):
             self.event_handlers[eventType.type] = set()
 
         self.event_handlers[eventType.type].add(handler)
-    def unregisterEventHandler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
+    def unregister_event_handler(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> None:
         logger.debug(f"Unregistered event handler {handler!r} for event type {eventType.__qualname__}")
         """
         unregister an event handler for a given event type,
@@ -413,33 +413,33 @@ class Window(asyncio.AbstractEventLoop):
             raise ValueError(f"Event handler {handler!r} is not registered")
         
         self.event_handlers[eventType.type].remove(handler)
-    def isEventHandlerRegistered(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> bool:
+    def is_event_handler_registered(self, eventType: Type[EventT], handler: Callable[[EventT], None]) -> bool:
         """
         Return whether or not an event handler is registered
         """
         return eventType.type in self.event_handlers and handler in self.event_handlers[eventType.type]
-    def postEvent(self, event: EventT | pygame.event.Event) -> None:
+    def post_event(self, event: EventT | pygame.event.Event) -> None:
         """
         Post ether an asyncUi event or an pygame event to the event queue
         """
         if isinstance(event, pygame.event.Event):
             pygame.event.post(event)
         else:
-            pygame.event.post(events.toPygameEvent(event))
+            pygame.event.post(events.to_pygame_event(event))
     
 
     #aync event handling
-    def getEvent(self, eventType: Type[EventT]) -> Awaitable[EventT]:
+    def get_event(self, eventType: Type[EventT]) -> Awaitable[EventT]:
         """Asynchronously await for the next event of given type"""
         eventFuture = asyncio.Future[EventT]()
         def eventHook(event: EventT) -> None:
             eventFuture.set_result(event)
-            self.unregisterEventHandler(eventType, eventHook)
-        self.registerEventHandler(eventType, eventHook)
+            self.unregister_event_handler(eventType, eventHook)
+        self.register_event_handler(eventType, eventHook)
         return eventFuture
 
     # Renderering
-    def _resizeHandler(self, event: events.VideoResize) -> None:
+    def _resize_handler(self, event: events.VideoResize) -> None:
         newHeight = event.w * (self.orginal_size[1] / self.orginal_size[0])
         pygame.display.set_mode((event.w, newHeight), self.window.get_flags())
 
@@ -450,7 +450,7 @@ class Window(asyncio.AbstractEventLoop):
         """
         return self.window.get_size()[0]/self.orginal_size[0]
 
-    def startRenderer(self, fps: int, renderer: Callable[['Window'], None]) -> Renderer:
+    def start_renderer(self, fps: int, renderer: Callable[['Window'], None]) -> Renderer:
         """
         Starts rendering via the renderer function at the given FPS,
         returning a Rederer instance.
@@ -465,7 +465,7 @@ class Window(asyncio.AbstractEventLoop):
     # Scheduling callbacks for asyncio
     def callSoon(self, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.Handle:
         handle = asyncio.Handle(callback, args, self, context)
-        self.postEvent(ExecuteCallbackEvent(handle))
+        self.post_event(ExecuteCallbackEvent(handle))
         return handle
     call_soon = callSoon #type: ignore #Type shed's arguments arne't correct, *args should be a TypeVarTuple, not Any
     def callSoonThreadsafe(self, callback: Callable[[*Ts], None], *args: *Ts, context: Context | None = None) -> asyncio.Handle:
@@ -525,7 +525,7 @@ class Window(asyncio.AbstractEventLoop):
         This is the event handler that is used to exacute Handles
         """
         event.handle._run()
-    def _handleEvent(self, event: events.Event | None) -> None:
+    def _handle_event(self, event: events.Event | None) -> None:
         """
         Execaute every event handler assosated with an event
         """
@@ -545,7 +545,7 @@ class Window(asyncio.AbstractEventLoop):
 
             #self.callSoon(handler, event)
 
-    def _waitForEvent(self) -> events.Event | None:
+    def _wait_for_event(self) -> events.Event | None:
         soonestEvent = self.timers.soonest()
         if soonestEvent == float('inf'):
             return events.marshal(pygame.event.wait())
@@ -555,7 +555,7 @@ class Window(asyncio.AbstractEventLoop):
         logger.info(f'{self!r} begain event loop')
         self.running = True
         while self.running:
-            self._handleEvent(self._waitForEvent())
+            self._handle_event(self._wait_for_event())
         logger.info(f'{self!r} stoped event loop')
     run_forever = run
 
@@ -573,9 +573,8 @@ class Window(asyncio.AbstractEventLoop):
 
     def stop(self) -> None:
         self.running = False
-    def isRunning(self) -> bool:
+    def is_running(self) -> bool:
         return self.running
-    is_running = isRunning
 
     def close(self) -> None:
         #This is a singleton, you can't close a singleton...
@@ -636,7 +635,7 @@ class Window(asyncio.AbstractEventLoop):
             
             return cls.__instance
 
-    def hasInstance(self) -> bool:
+    def has_instance(self) -> bool:
         return self.__instance is not None
 
 

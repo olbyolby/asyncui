@@ -12,7 +12,7 @@ class MutableContextManager(Generic[T]):
         self.context.__exit__(None, None, None)
         self.context = context
         self.value = context.__enter__()
-    def getValue(self) -> T:
+    def get_value(self) -> T:
         return self.value
 
 

@@ -5,8 +5,7 @@ from .utils.descriptors import Placeholder
 from .window import Window
 from contextlib import ExitStack
 from types import TracebackType, EllipsisType
-from functools import wraps, cached_property as cachedProperty
-
+from functools import wraps, cached_property
 __all__ = [
     'Color',
     'Point',
@@ -14,7 +13,7 @@ __all__ = [
     'Drawable',
     'Scale',
     'AutomaticStack',
-    'stackEnabler',
+    'stack_enabler',
     'renderer'
 ]
 
@@ -84,9 +83,9 @@ class Drawable(ABC):
         ...
 
     position = Placeholder[Point]((0, 0))
-    size: cachedProperty[Size] | Placeholder[Size]
+    size: cached_property[Size] | Placeholder[Size]
 
-    body: cachedProperty[Rect] = cachedProperty[Rect](lambda s: Rect(s.position, s.size))
+    body: cached_property[Rect] = cached_property[Rect](lambda s: Rect(s.position, s.size))
 
 class Scale: 
     def __init__(self, scale: float) -> None:
@@ -129,7 +128,7 @@ class AutomaticStack:
         return self
     
 _AutoStackT = TypeVar('_AutoStackT', bound=AutomaticStack)
-def stackEnabler(function: Callable[[_AutoStackT, ExitStack], None]) -> Callable[[_AutoStackT], None]:
+def stack_enabler(function: Callable[[_AutoStackT, ExitStack], None]) -> Callable[[_AutoStackT], None]:
     """
     Automaticlly manage the ExitStack for an `AutomaticStack`,
 
@@ -165,7 +164,7 @@ def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[
         return function(self, window, Scale(scale))
     return wrapper
 
-def widgetRenderer(function: Callable[[T], Iterable[Drawable]]) -> Callable[[T, pygame.Surface, float], None]:
+def widget_renderer(function: Callable[[T], Iterable[Drawable]]) -> Callable[[T, pygame.Surface, float], None]:
     @wraps(function)
     def wrapper(self: T, window: pygame.Surface, scale: float) -> None:
         for drawable in function(self):
@@ -188,10 +187,10 @@ class Clip:
         self.old_clip = self.target.get_clip()
         self.target.set_clip(self.area)
         return self
-    def __exit__(self, exceptionType: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
+    def __exit__(self, exception_type: Type[BaseException] | None, exception: BaseException | None, traceback: TracebackType | None,/) -> None:
         self.target.set_clip(self.old_clip)
 
-def drawableRenderer(target: Drawable) -> Callable[[Window], None]:
+def drawable_renderer(target: Drawable) -> Callable[[Window], None]:
     def wrapper(window: Window) -> None:
         target.draw(window.window, window.scale_factor)
     return wrapper

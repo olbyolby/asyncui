@@ -1,8 +1,8 @@
 from __future__ import annotations
 from types import EllipsisType
-from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler
+from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stack_enabler, renderer, Clip, rescaler
 from typing import TypeVar, Iterable, Final, Callable, Sequence, Generic
-from functools import cached_property as cachedProperty
+from functools import cached_property
 from .resources.fonts import Font
 from contextlib import ExitStack
 from .import events
@@ -14,7 +14,7 @@ import pygame
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
 
-def renderAll(window: pygame.Surface, scale: float, *targets: Drawable) -> None:
+def render_all(window: pygame.Surface, scale: float, *targets: Drawable) -> None:
     for target in targets:
         target.draw(window, scale)
 
@@ -29,7 +29,7 @@ class Box(Drawable):
         self.color = color
         self.thinkness = thinkness
     
-    @cachedProperty[pygame.Rect]
+    @cached_property[pygame.Rect]
     def body(self) -> pygame.Rect:
         return pygame.Rect(*self.position, *self.size)
     
@@ -73,7 +73,7 @@ class Image(Drawable):
     def rescale(self, scale: Scale) -> 'Image':
         return Image(scale.point(self.position), self.surface, scale.size(self.size))
 
-    @cachedProperty[pygame.Rect]
+    @cached_property[pygame.Rect]
     def body(self) -> pygame.Rect:
         return pygame.Rect(self.position, self.size)
     
@@ -95,17 +95,17 @@ class Text(Drawable):
 
     
     
-    size = cachedProperty(lambda self: self.font[self.font_size].size(self.text))
+    size = cached_property(lambda self: self.font[self.font_size].size(self.text))
 
 
-    @cachedProperty[pygame.Rect]
+    @cached_property[pygame.Rect]
     def body(self) -> pygame.Rect:
         return pygame.Rect(*self.position, *self.size)
     
-    def characterPosition(self, index: int) -> Point:
+    def character_position(self, index: int) -> Point:
         return self.font[self.font_size].size(self.text[:index])[0] + self.position[0], self.position[1]
 
-    @cachedProperty
+    @cached_property
     def height(self) -> int:
         return self.font[self.font_size].get_linesize()
 
@@ -139,17 +139,17 @@ class Clickable(AutomaticStack):
         self.debounce = False
         self._stack = ExitStack()
 
-    @cachedProperty
+    @cached_property
     def area(self) -> pygame.rect.Rect:
         return pygame.Rect(*self.position, *self.size) 
     
     @eventHandlerMethod
-    def _clickDownHandler(self, event: events.MouseButtonDown) -> None:
+    def _click_down_handler(self, event: events.MouseButtonDown) -> None:
         scale = Scale(Window().scale_factor)
         if self.debounce is False and  scale.rect(self.area).collidepoint(event.pos):
             self.debounce = True
     @eventHandlerMethod
-    def _clickUpHandler(self, event: events.MouseButtonUp) -> None:
+    def _click_up_handler(self, event: events.MouseButtonUp) -> None:
         scale = Scale(Window().scale_factor)
         if self.debounce is True:
             self.debounce = False
@@ -158,8 +158,8 @@ class Clickable(AutomaticStack):
 
     def enable(self) -> None:
         with ExitStack() as stack:
-            stack.enter_context(self._clickDownHandler)
-            stack.enter_context(self._clickUpHandler)
+            stack.enter_context(self._click_down_handler)
+            stack.enter_context(self._click_up_handler)
             self._stack = stack.pop_all()
 
 class Hoverable(AutomaticStack): 
@@ -171,12 +171,12 @@ class Hoverable(AutomaticStack):
         self.on_hover_end = CallbackWrapper(end_hover)
 
         self._hovered = False
-    @cachedProperty
+    @cached_property
     def area(self) -> pygame.rect.Rect:
         return pygame.Rect(*self.position, *self.size) 
     
     @eventHandlerMethod
-    def _hoverHandler(self, event: events.MouseMove) -> None:
+    def _hover_handler(self, event: events.MouseMove) -> None:
         scale = Scale(Window().scale_factor)
         if self._hovered is False and scale.rect(self.area).collidepoint(event.pos):
             self._hovered = True
@@ -189,7 +189,7 @@ class Hoverable(AutomaticStack):
 
     def enable(self) -> None:
         with ExitStack() as stack:
-            stack.enter_context(self._hoverHandler)
+            stack.enter_context(self._hover_handler)
 
             self._stack = stack.pop_all()
 
@@ -203,11 +203,11 @@ class Focusable(AutomaticStack):
     
         self._selected = False
 
-    @cachedProperty
+    @cached_property
     def area(self) -> pygame.rect.Rect:
         return pygame.Rect(*self.position, *self.size) 
     @eventHandlerMethod
-    def _clickHandler(self, event: events.MouseButtonDown) -> None:
+    def _click_handler(self, event: events.MouseButtonDown) -> None:
         scale = Scale(Window().scale_factor)
         if self._selected is True and not scale.rect(self.area).collidepoint(event.pos):
             self._selected = False
@@ -216,9 +216,9 @@ class Focusable(AutomaticStack):
             self._selected = True
             self.on_focus.invoke()
 
-    @stackEnabler
+    @stack_enabler
     def enable(self, stack: ExitStack) -> None:
-        stack.enter_context(self._clickHandler)
+        stack.enter_context(self._click_handler)
 
 class InputBoxDisplay(Drawable):
     """
@@ -240,7 +240,7 @@ class InputBoxDisplay(Drawable):
             self.text = text
 
         self.show_cursor = show_cursor
-        self.cursor_box = Box(self.text.characterPosition(cursor_position), (2, self.text.height), self.text.color)
+        self.cursor_box = Box(self.text.character_position(cursor_position), (2, self.text.height), self.text.color)
         self.cursor_position  = cursor_position
 
     @renderer
@@ -254,35 +254,35 @@ class InputBoxDisplay(Drawable):
     def reposition(self, position: Point | EllipsisType) -> 'InputBoxDisplay':
         return InputBoxDisplay(position, self.text, self.background, self.cursor_position, self.show_cursor)
 
-    def appendText(self, text: str) -> 'InputBoxDisplay':
+    def append_text(self, text: str) -> 'InputBoxDisplay':
         return InputBoxDisplay(self.position, self.text.changeText(self.text.text+text), self.background, self.cursor_position, self.show_cursor)
-    def changeText(self, text: str) -> 'InputBoxDisplay':
+    def change_text(self, text: str) -> 'InputBoxDisplay':
         return InputBoxDisplay(self.position, self.text.changeText(text), self.background, self.cursor_position, self.show_cursor)
-    def changeCursorPosition(self, position: int) -> 'InputBoxDisplay':
+    def change_cursor_position(self, position: int) -> 'InputBoxDisplay':
         position = max(min(position, len(self.text.text)), 0)
         return InputBoxDisplay(self.position, self.text, self.background, position, self.show_cursor)
-    def insertText(self, text: str) -> 'InputBoxDisplay':
-        return self.changeText(self.text.text[:self.cursor_position] + text + self.text.text[self.cursor_position:]).changeCursorPosition(self.cursor_position+len(text))
+    def insert_text(self, text: str) -> 'InputBoxDisplay':
+        return self.change_text(self.text.text[:self.cursor_position] + text + self.text.text[self.cursor_position:]).change_cursor_position(self.cursor_position+len(text))
     def backspace(self) -> 'InputBoxDisplay':
         if self.cursor_position == 0:
             return self
-        return self.changeText(self.text.text[:self.cursor_position-1] + self.text.text[self.cursor_position:]).changeCursorPosition(self.cursor_position-1)
+        return self.change_text(self.text.text[:self.cursor_position-1] + self.text.text[self.cursor_position:]).change_cursor_position(self.cursor_position-1)
     def delete(self) -> 'InputBoxDisplay':
         if self.cursor_position == len(self.text.text):
             return self
-        return self.changeText(self.text.text[:self.cursor_position] + self.text.text[self.cursor_position+1:])
-    def changeCursorShown(self, state: bool) -> 'InputBoxDisplay':
+        return self.change_text(self.text.text[:self.cursor_position] + self.text.text[self.cursor_position+1:])
+    def change_cursor_shown(self, state: bool) -> 'InputBoxDisplay':
         return InputBoxDisplay(self.position, self.text, self.background, self.cursor_position, state)
     
     @rescaler
     def rescale(self, scale: Scale) -> 'InputBoxDisplay':
         return InputBoxDisplay(scale.point(self.position), self.text.rescale(scale.scale_factor), self.background.rescale(scale.scale_factor), self.cursor_position, self.show_cursor)
 
-    @cachedProperty[pygame.Rect]
+    @cached_property[pygame.Rect]
     def body(self) -> pygame.Rect:
         return self.background.body
     
-    size = cachedProperty[Size](lambda s: s.background.size)
+    size = cached_property[Size](lambda s: s.background.size)
 
 class InputBox(Drawable, AutomaticStack):
     """
@@ -302,13 +302,13 @@ class InputBox(Drawable, AutomaticStack):
     """
     def __init__(self, textBox: InputBoxDisplay, on_enter: Callback[str], on_change: Callback[str], input_validater: Callable[[str], bool] = lambda s: True) -> None:
         self.position = textBox.position
-        self.__textBox = textBox.changeCursorShown(False)
+        self.__textBox = textBox.change_cursor_shown(False)
         self.on_enter = CallbackWrapper(on_enter)
         self.on_change = CallbackWrapper(on_change)
         self.input_validater = input_validater
 
         self._focused = False
-        self._focuser = Focusable(textBox.position, textBox.size, self._onFocus, self._onUnfocus)
+        self._focuser = Focusable(textBox.position, textBox.size, self._on_focus, self._on_unfocus)
     
     def draw(self, window: pygame.Surface, scale: float) -> None:
         self.text_box.draw(window, scale)
@@ -318,9 +318,9 @@ class InputBox(Drawable, AutomaticStack):
         return InputBox(self.text_box.rescale(factor), self.on_enter, self.on_change)
 
     
-    def getSize(self) -> Size:
+    def get_size(self) -> Size:
         return self.text_box.size
-    size = cachedProperty[Size](getSize)
+    size = cached_property[Size](get_size)
 
     @property
     def text_box(self) -> InputBoxDisplay:
@@ -331,18 +331,18 @@ class InputBox(Drawable, AutomaticStack):
             self.__textBox = value
             self.on_change.invoke(value.text.text)    
 
-    def _onFocus(self) -> None:
-        self.text_box = self.text_box.changeCursorShown(True)
+    def _on_focus(self) -> None:
+        self.text_box = self.text_box.change_cursor_shown(True)
         self._focused = True
-    def _onUnfocus(self) -> None:
-        self.text_box = self.text_box.changeCursorShown(False)
+    def _on_unfocus(self) -> None:
+        self.text_box = self.text_box.change_cursor_shown(False)
         self._focused = False
     @eventHandlerMethod
-    def _textInput(self, event: events.TextInput) -> None:
+    def _text_input(self, event: events.TextInput) -> None:
         if self._focused:
-            self.text_box = self.text_box.insertText(event.text)
+            self.text_box = self.text_box.insert_text(event.text)
     @eventHandlerMethod
-    def _keyDown(self, event: events.KeyDown) -> None:
+    def _key_down(self, event: events.KeyDown) -> None:
         if self._focused:
             match event.key:
                 case events.keyboard.Keys.Backspace:
@@ -350,21 +350,21 @@ class InputBox(Drawable, AutomaticStack):
                 case events.keyboard.Keys.Delete:
                     self.text_box = self.text_box.delete()
                 case events.keyboard.Keys.Left:
-                    self.text_box = self.text_box.changeCursorPosition(self.text_box.cursor_position-1)
+                    self.text_box = self.text_box.change_cursor_position(self.text_box.cursor_position-1)
                 case events.keyboard.Keys.Right:
-                    self.text_box = self.text_box.changeCursorPosition(self.text_box.cursor_position+1)
+                    self.text_box = self.text_box.change_cursor_position(self.text_box.cursor_position+1)
                 case events.keyboard.Keys.Return:
                     if self.on_enter is not None:
                         self.on_enter.invoke(self.text_box.text.text)
     
-    @stackEnabler
+    @stack_enabler
     def enable(self, stack: ExitStack) -> None:
         """Enable the handling of events(Should be done from context manager)"""
-        stack.enter_context(self._textInput)
-        stack.enter_context(self._keyDown)
+        stack.enter_context(self._text_input)
+        stack.enter_context(self._key_down)
         stack.enter_context(self._focuser)
 
-def addPoint(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
+def add_point(a: tuple[int, int], b: tuple[int, int]) -> tuple[int, int]:
     return a[0] + b[0], a[1] + b[1]
 class Polygon(Drawable):
     def __init__(self, position: Inferable[Point], color: Color, points: Sequence[Point], thickness: int = 0) -> None:
@@ -377,12 +377,12 @@ class Polygon(Drawable):
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
         pygame.draw.polygon(window, self.color, [scale.point(point) for point in self.absolutePoints], scale.length(self.thickness))
 
-    @cachedProperty[list[Point]]
+    @cached_property[list[Point]]
     def absolutePoints(self) -> list[Point]:
-        return [addPoint(self.position, point) for point in self.points]
+        return [add_point(self.position, point) for point in self.points]
     
     
-    def getSize(self) -> Size:
+    def get_size(self) -> Size:
         minX, maxX = 0, 0
         minY, maxY = 0, 0
         for (x, y) in self.points:
@@ -390,7 +390,7 @@ class Polygon(Drawable):
             minY, maxY = min(minY, y), max(maxY, y)
         
         return (maxX - minX), (maxY - minY)
-    size = cachedProperty[Size](getSize)
+    size = cached_property[Size](get_size)
 
     def reposition(self, position: Point | EllipsisType) -> 'Polygon':
         return Polygon(position, self.color, self.points)
@@ -408,39 +408,39 @@ class Line(Drawable):
         pygame.draw.line(
             window, 
             self.color, 
-            scale.point(addPoint(addPoint(self.start, self.position), line_offset)), 
-            scale.point(addPoint(addPoint(self.end, self.position), line_offset)), 
+            scale.point(add_point(add_point(self.start, self.position), line_offset)), 
+            scale.point(add_point(add_point(self.end, self.position), line_offset)), 
             int(self.thickness*scale.scale_factor)
             )
 
     def reposition(self, position: Inferable[Point]) -> 'Line':
         return Line(position, self.color, self.thickness, self.start, self.end)
     
-    def changePoint(self, start: Inferable[Point], end: Inferable[Point]) -> Line:
+    def change_point(self, start: Inferable[Point], end: Inferable[Point]) -> Line:
         return Line(self.position, self.color, self.thickness, self.start if start is ... else start, self.end if end is ... else end)
 
 class Group(Drawable, AutomaticStack):
     def __init__(self, position: Inferable[Point], widgets: Iterable[Drawable]) -> None:
         self.position = position
-        self.widgets = [widget.reposition(addPoint(self.position,widget.position)) for widget in widgets]
+        self.widgets = [widget.reposition(add_point(self.position,widget.position)) for widget in widgets]
     def draw(self, window: pygame.Surface, scale: float) -> None:
         for widget in self.widgets:
             widget.draw(window, scale)
     def reposition(self, position: Inferable[Point]) -> 'Group':
         return Group(position, (widget.reposition((widget.position[0] - self.position[0], widget.position[1] - self.position[1])) for widget in self.widgets))
-    @stackEnabler
+    @stack_enabler
     def enable(self, stack: ExitStack) -> None:
         for widget in self.widgets:
             if isinstance(widget, AutomaticStack):
                 stack.enter_context(widget)
 
-    def getSize(self) -> Size:
+    def get_size(self) -> Size:
         max_x = max_y = 0
         for widget in self.widgets:
             max_x = max(widget.position[0] + widget.size[0], max_x)
             max_y = max(widget.position[1] + widget.size[1], max_y)
         return max_x - self.position[0], max_y - self.position[1]
-    size = cachedProperty(getSize)
+    size = cached_property(get_size)
    
 class Circle(Drawable):
     def __init__(self, position: Inferable[Point], color: Color, radius: int, thickness: int = 0) -> None:
@@ -451,14 +451,14 @@ class Circle(Drawable):
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.circle(window, self.color, scale.point(addPoint(self.position, (self.radius, self.radius))), self.radius*scale.scale_factor, int(self.thickness*scale.scale_factor))
+        pygame.draw.circle(window, self.color, scale.point(add_point(self.position, (self.radius, self.radius))), self.radius*scale.scale_factor, int(self.thickness*scale.scale_factor))
 
     def reposition(self, position: Point | EllipsisType) -> Circle:
         return Circle(position, self.color, self.radius, self.thickness)
     
-    def getSize(self) -> Size:
+    def get_size(self) -> Size:
         return (self.radius, self.radius)
-    size = cachedProperty[Size](getSize)
+    size = cached_property[Size](get_size)
 
 class Button(Drawable, AutomaticStack):
     size = Placeholder[Size]((0,0))
@@ -468,11 +468,11 @@ class Button(Drawable, AutomaticStack):
         self.size = widget.size
         self.clicked = CallbackWrapper(on_click)
 
-    @cachedProperty[Clickable]
+    @cached_property[Clickable]
     def _clicker(self) -> Clickable:
         return Clickable(self.position, self.size, lambda e: self.clicked.invoke())
     
-    @stackEnabler
+    @stack_enabler
     def enable(self, stack: ExitStack) -> None:
         stack.enter_context(self._clicker)
 
@@ -490,24 +490,24 @@ class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
 
         self.background = Box(position, size, color)
         self.title = title.reposition(position)
-        self.screen = inside.reposition(... if position is ... else addPoint(position, (0,self.title.height)))
+        self.screen = inside.reposition(... if position is ... else add_point(position, (0,self.title.height)))
         self.close = CallbackWrapper(close)
     
-    @cachedProperty
-    def exitButton(self) -> Button:
+    @cached_property
+    def exit_button(self) -> Button:
         size = self.size
-        return Button(addPoint(self.position, (size[0]-size[0]//8, 0)), Box(..., (size[0]//8, self.title.height), Color(255, 0, 0)), self.close)
+        return Button(add_point(self.position, (size[0]-size[0]//8, 0)), Box(..., (size[0]//8, self.title.height), Color(255, 0, 0)), self.close)
    
-    @stackEnabler
+    @stack_enabler
     def enable(self, stack: ExitStack) -> None:
-        stack.enter_context(self.exitButton)
+        stack.enter_context(self.exit_button)
         if isinstance(self.screen, AutomaticStack):
             stack.enter_context(self.screen)
 
     def draw(self, window: pygame.Surface, scale: float) -> None:
         self.background.draw(window, scale)
         self.title.draw(window, scale)
-        self.exitButton.draw(window, scale)
+        self.exit_button.draw(window, scale)
         self.screen.draw(window, scale)
 
     def reposition(self, position: Inferable[Point]) -> 'MenuWindow[DrawableT]':
@@ -530,7 +530,7 @@ def overlap() -> coroutines.Stateful[Drawable, Drawable]:
         widget, = yield widget.reposition(base.position)
 @transformers.transformerFactory
 @coroutines.statefulFunction
-def horizontalAligned() -> coroutines.Stateful[Drawable, Drawable]:
+def horizontal_aligned() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
     x_offset = coroutines.accumulate(widget.position[0])
     while True:
@@ -538,7 +538,7 @@ def horizontalAligned() -> coroutines.Stateful[Drawable, Drawable]:
 
 @transformers.transformerFactory
 @coroutines.statefulFunction
-def verticalAligned() -> coroutines.Stateful[Drawable, Drawable]:
+def vertical_aligned() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
     y_offset = coroutines.accumulate(widget.position[1])
     while True:
