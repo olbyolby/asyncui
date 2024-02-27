@@ -22,7 +22,7 @@ import time
 import warnings
 import inspect
 import functools
-from typing import Protocol, Awaitable, Generic, Callable, TypeVar, cast, Type, Any, TypeVarTuple, Self, overload, Coroutine, Generator, Never, get_type_hints as getTypeHints
+from typing import Protocol, Awaitable, Generic, Callable, TypeVar, Type, Any, TypeVarTuple, Self, overload, Coroutine, Generator, Never, get_type_hints as getTypeHints
 from . import events
 from contextvars import Context
 from dataclasses import dataclass
@@ -378,14 +378,14 @@ class Window(asyncio.AbstractEventLoop):
         self.renderer: Renderer | None = None
         self.default_executor: Executor = ThreadPoolExecutor(5)
 
-        self.register_event_handler(ExecuteCallbackEvent, self._run_exacute_callback)
+        self.register_event_handler(ExecuteCallbackEvent, self._run_execute_callback)
         self.register_event_handler(events.VideoResize, self._resize_handler)
 
         self.closed= False
         self.running = False
         self.debug = __debug__
 
-        self.errorHandler: Callable[[asyncio.AbstractEventLoop, dict[str, Any]], object] | None = None
+        self.error_handler: Callable[[asyncio.AbstractEventLoop, dict[str, Any]], object] | None = None
         asyncio._set_running_loop(self)
 
     
@@ -490,11 +490,11 @@ class Window(asyncio.AbstractEventLoop):
         return time.monotonic()
 
     # Exceutors
-    def runInExecutor(self, executor: Executor | None, function: Callable[[*Ts], T], *args: *Ts) -> asyncio.Future[T]:
+    def run_in_executor(self, executor: Executor | None, function: Callable[[*Ts], T], *args: *Ts) -> asyncio.Future[T]:
         if executor is None:
             executor = self.default_executor
         return asyncio.wrap_future(executor.submit(function, *args))
-    run_in_executor = cast(Any, runInExecutor)
+
     def set_default_executor(self, executor: Executor) -> None:
         self.default_executor.shutdown(cancel_futures=True)
         self.default_executor = executor
@@ -520,7 +520,7 @@ class Window(asyncio.AbstractEventLoop):
 
     #Running events
 
-    def _run_exacute_callback(self, event: ExecuteCallbackEvent) -> None:
+    def _run_execute_callback(self, event: ExecuteCallbackEvent) -> None:
         """
         This is the event handler that is used to exacute Handles
         """
@@ -590,28 +590,28 @@ class Window(asyncio.AbstractEventLoop):
     def default_exception_handler(self: asyncio.AbstractEventLoop, context: dict[Any, Any]) -> None:
         exception: Exception | None = context.get('exception')
         if exception is not None:
-            exceptionInfo = (type(exception), exception, exception.__traceback__)
+            exception_info = (type(exception), exception, exception.__traceback__)
         else:
-            exceptionInfo = None
+            exception_info = None
         
-        additionalContext: list[str] = []
+        additional_context: list[str] = []
         for key, value in sorted(context.items()):
             if key in ('exception'): 
                 continue
-            additionalContext.append(f"{key}: {value!r}")
+            additional_context.append(f"{key}: {value!r}")
 
-        logger.error('\n'.join(additionalContext), exc_info=exceptionInfo)
+        logger.error('\n'.join(additional_context), exc_info=exception_info)
 
 
     def set_exception_handler(self, handler: Callable[[asyncio.AbstractEventLoop, dict[str, Any]], object] | None) -> None: 
-        self.errorHandler = handler
+        self.error_handler = handler
     def get_exception_handler(self) -> Callable[[asyncio.AbstractEventLoop, dict[str, Any]], object] | None: 
-        return self.errorHandler if self.errorHandler is not None else type(self).default_exception_handler
+        return self.error_handler if self.error_handler is not None else type(self).default_exception_handler
     def call_exception_handler(self, context: dict[Any, Any]) -> None:
-        if self.errorHandler is None:
+        if self.error_handler is None:
             self.default_exception_handler(context)
         else:
-            self.errorHandler(self, context)
+            self.error_handler(self, context)
     
 
     # Supporting stuff for singletons
@@ -705,11 +705,3 @@ class Window(asyncio.AbstractEventLoop):
     async def start_tls(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("pygame event loop does not support start_tls")
     
-import threading  # noqa: E402
-class WindowEventLoopPolicy(asyncio.AbstractEventLoopPolicy):
-
-    def new_event_loop(self) -> asyncio.AbstractEventLoop:
-        if threading.current_thread() is threading.main_thread():
-            return Window()
-        return super().new_event_loop()
-            
