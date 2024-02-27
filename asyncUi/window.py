@@ -76,11 +76,11 @@ class EventHandler(Generic[EventT]):
         self.unregister()
 
 @overload
-def eventHandler(event_type: Type[EventT], /) -> Callable[[Callable[[EventT], None]], EventHandler[EventT]]: ...
+def event_handler(event_type: Type[EventT], /) -> Callable[[Callable[[EventT], None]], EventHandler[EventT]]: ...
 @overload
-def eventHandler(event_handler: Callable[[EventT], None], /) -> EventHandler[EventT]: ...
+def event_handler(event_handler: Callable[[EventT], None], /) -> EventHandler[EventT]: ...
 
-def eventHandler(event_type: Type[EventT] | Callable[[EventT], None]) -> Callable[[Callable[[EventT], None]], EventHandler[EventT]] | EventHandler[EventT]: 
+def event_handler(event_type: Type[EventT] | Callable[[EventT], None]) -> Callable[[Callable[[EventT], None]], EventHandler[EventT]] | EventHandler[EventT]: 
     """
     An alternative constructor to `EventHandler`, supports use as a function decorator without type hints or with type hints,
     It is preferred over `EventHandler` directly.
@@ -153,12 +153,12 @@ class MethodEventHandler(Generic[T, EventT]):
         return handler  
     
 @overload
-def eventHandlerMethod(event_type: Type[EventT], /) -> Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:  ...
+def event_handler_method(event_type: Type[EventT], /) -> Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:  ...
 
 @overload
-def eventHandlerMethod(handler: Callable[[T, EventT], None], /) -> MethodEventHandler[T, EventT]: ...
+def event_handler_method(handler: Callable[[T, EventT], None], /) -> MethodEventHandler[T, EventT]: ...
 
-def eventHandlerMethod(handler_or_type: Type[EventT] | Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT] | Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:
+def event_handler_method(handler_or_type: Type[EventT] | Callable[[T, EventT], None]) -> MethodEventHandler[T, EventT] | Callable[[Callable[[T, EventT], None]], MethodEventHandler[T, EventT]]:
     """
     Create an event handler from a class method
 
@@ -250,7 +250,7 @@ class TimerList:
         Useful for non-busy waiting for events, wait ether for the next event or next timeout.
         """
         soonest: float = float('inf')
-        self.executeAll()
+        self.execute_all()
         for timer in self.timers:
             timeUntil = timer.when() - Window().time()
 
@@ -258,7 +258,7 @@ class TimerList:
                 soonest = timeUntil
 
         return soonest
-    def executeAll(self) -> None:
+    def execute_all(self) -> None:
         """
         Schedule the execution of all TimedHandles which have timed out
         """
@@ -374,7 +374,7 @@ class Window(asyncio.AbstractEventLoop):
         self.window = window
         self.event_handlers: dict[int, set[Callable[[Any], None]]] = {}
         self.timers = TimerList()
-        self.orginal_size =  unscaled_size
+        self.unscaled_size =  unscaled_size
         self.renderer: Renderer | None = None
         self.default_executor: Executor = ThreadPoolExecutor(5)
 
@@ -431,24 +431,24 @@ class Window(asyncio.AbstractEventLoop):
     #aync event handling
     def get_event(self, eventType: Type[EventT]) -> Awaitable[EventT]:
         """Asynchronously await for the next event of given type"""
-        eventFuture = asyncio.Future[EventT]()
+        event_future = asyncio.Future[EventT]()
         def eventHook(event: EventT) -> None:
-            eventFuture.set_result(event)
+            event_future.set_result(event)
             self.unregister_event_handler(eventType, eventHook)
         self.register_event_handler(eventType, eventHook)
-        return eventFuture
+        return event_future
 
     # Renderering
     def _resize_handler(self, event: events.VideoResize) -> None:
-        newHeight = event.w * (self.orginal_size[1] / self.orginal_size[0])
-        pygame.display.set_mode((event.w, newHeight), self.window.get_flags())
+        new_height = event.w * (self.unscaled_size[1] / self.unscaled_size[0])
+        pygame.display.set_mode((event.w, new_height), self.window.get_flags())
 
     @property
     def scale_factor(self) -> float:
         """
         Returns the scale factor between the inital window size and it's current size
         """
-        return self.window.get_size()[0]/self.orginal_size[0]
+        return self.window.get_size()[0]/self.unscaled_size[0]
 
     def start_renderer(self, fps: int, renderer: Callable[['Window'], None]) -> Renderer:
         """

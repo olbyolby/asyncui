@@ -6,7 +6,7 @@ from functools import cached_property
 from .resources.fonts import Font
 from contextlib import ExitStack
 from .import events
-from .window import eventHandlerMethod, Window
+from .window import event_handler_method, Window
 from .utils import coroutines, transformers
 from .utils.callbacks import Callback, CallbackWrapper
 from .utils.descriptors import Placeholder, Inferable
@@ -143,12 +143,12 @@ class Clickable(AutomaticStack):
     def area(self) -> pygame.rect.Rect:
         return pygame.Rect(*self.position, *self.size) 
     
-    @eventHandlerMethod
+    @event_handler_method
     def _click_down_handler(self, event: events.MouseButtonDown) -> None:
         scale = Scale(Window().scale_factor)
         if self.debounce is False and  scale.rect(self.area).collidepoint(event.pos):
             self.debounce = True
-    @eventHandlerMethod
+    @event_handler_method
     def _click_up_handler(self, event: events.MouseButtonUp) -> None:
         scale = Scale(Window().scale_factor)
         if self.debounce is True:
@@ -175,7 +175,7 @@ class Hoverable(AutomaticStack):
     def area(self) -> pygame.rect.Rect:
         return pygame.Rect(*self.position, *self.size) 
     
-    @eventHandlerMethod
+    @event_handler_method
     def _hover_handler(self, event: events.MouseMove) -> None:
         scale = Scale(Window().scale_factor)
         if self._hovered is False and scale.rect(self.area).collidepoint(event.pos):
@@ -206,7 +206,7 @@ class Focusable(AutomaticStack):
     @cached_property
     def area(self) -> pygame.rect.Rect:
         return pygame.Rect(*self.position, *self.size) 
-    @eventHandlerMethod
+    @event_handler_method
     def _click_handler(self, event: events.MouseButtonDown) -> None:
         scale = Scale(Window().scale_factor)
         if self._selected is True and not scale.rect(self.area).collidepoint(event.pos):
@@ -337,11 +337,11 @@ class InputBox(Drawable, AutomaticStack):
     def _on_unfocus(self) -> None:
         self.text_box = self.text_box.change_cursor_shown(False)
         self._focused = False
-    @eventHandlerMethod
+    @event_handler_method
     def _text_input(self, event: events.TextInput) -> None:
         if self._focused:
             self.text_box = self.text_box.insert_text(event.text)
-    @eventHandlerMethod
+    @event_handler_method
     def _key_down(self, event: events.KeyDown) -> None:
         if self._focused:
             match event.key:
