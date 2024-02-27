@@ -361,10 +361,12 @@ class Window(asyncio.AbstractEventLoop):
     """
 
 
-    def __init__(self, window: pygame.Surface | EllipsisType = ..., title: str | EllipsisType = ...) -> None:
+    def __init__(self, window: pygame.Surface | EllipsisType = ..., unscaled_size: tuple[int, int] | EllipsisType = ..., title: str | EllipsisType = ...) -> None:
         if window is ...: 
             return
         if title is ...: 
+            return
+        if unscaled_size is ...:
             return
 
         pygame.display.set_caption(title)
@@ -372,7 +374,7 @@ class Window(asyncio.AbstractEventLoop):
         self.window = window
         self.event_handlers: dict[int, set[Callable[[Any], None]]] = {}
         self.timers = TimerList()
-        self.orginal_size = window.get_size()
+        self.orginal_size =  unscaled_size
         self.renderer: Renderer | None = None
         self.default_executor: Executor = ThreadPoolExecutor(5)
 
@@ -617,11 +619,11 @@ class Window(asyncio.AbstractEventLoop):
     # Init via `Window(windowSurface)`, 
     # Get the current window via `Window()`
     __instance: Self | None = None
-    def __new__(cls, window: pygame.Surface | EllipsisType = ..., title: str | EllipsisType = ...) -> 'Window':
+    def __new__(cls, window: pygame.Surface | EllipsisType = ..., unscaled_size: tuple[int, int] | EllipsisType = ..., title: str | EllipsisType = ...) -> 'Window':
         #Check if no instance is set
         if cls.__instance is None:
             #if no instance is set, then initiazliation must be happening
-            if window is ... or title is ...:
+            if window is ... or title is ... or unscaled_size is ...:
                 raise RuntimeError(f"{__name__} is not initialized")
             self = super().__new__(cls)
             cls.__instance = self
@@ -629,7 +631,7 @@ class Window(asyncio.AbstractEventLoop):
             return self
         else:
             #if an instance is set, you can't provide init data.
-            if window is not ... or title is not ...:
+            if window is not ... or title is not ... or unscaled_size is not ...:
                 raise RuntimeError(f"{__name__} is already initialized")
             
             return cls.__instance
