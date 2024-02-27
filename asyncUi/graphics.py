@@ -1,7 +1,6 @@
 from __future__ import annotations
 from types import EllipsisType
-from .util import Placeholder, Inferable, CallbackWrapper, Callback
-from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler, widgetRenderer
+from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stackEnabler, renderer, Clip, rescaler
 from typing import TypeVar, Iterable, Final, Callable, Sequence, Generic
 from functools import cached_property as cachedProperty
 from .resources.fonts import Font
@@ -9,6 +8,8 @@ from contextlib import ExitStack
 from .import events
 from .window import eventHandlerMethod, Window
 from .utils import coroutines, transformers
+from .utils.callbacks import Callback, CallbackWrapper
+from .utils.descriptors import Placeholder, Inferable
 import pygame
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)

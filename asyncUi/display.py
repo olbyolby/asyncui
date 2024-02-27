@@ -1,7 +1,7 @@
 import pygame
 from abc import ABC, abstractmethod
 from typing import Self, Iterable, Type, Callable, TypeVar, Iterator, Sequence, overload
-from .util import Placeholder
+from .utils.descriptors import Placeholder
 from .window import Window
 from contextlib import ExitStack
 from types import TracebackType, EllipsisType

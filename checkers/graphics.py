@@ -1,9 +1,10 @@
 from asyncUi.window import Window, eventHandler
 from asyncUi import events
 from asyncUi.graphics import Box, Circle, Clickable, Text, Polygon, Line, horizontalAligned, verticalAligned, Group, MenuWindow, centered
-from asyncUi.utils import coroutines
 from asyncUi.display import drawableRenderer, Drawable, Color, Point, Size, Scale, stackEnabler, AutomaticStack
-from asyncUi.util import Placeholder, Inferable, CallbackWrapper, Callback, MutableContextManager
+from asyncUi.utils.context import MutableContextManager
+from asyncUi.utils.descriptors import Placeholder, Inferable
+from asyncUi.utils.callbacks import Callback, CallbackWrapper
 from asyncUi.resources.fonts import fontManager
 from . import engine
 from contextlib import ExitStack
@@ -261,11 +262,11 @@ class Game(Drawable, AutomaticStack):
         board = engine.Board(None, self.on_win, self._updateCurrentTeam)
         self.board_info = BoardInfo(position, (size[0], size[1]//9), board.current_player)
         self.board = CheckersBoard((self.position[0], self.position[1] + size[1]//9), (size[0], size[1] - size[1] // 9), board, lambda x: self.make_pop_up("Illegal move", x))
-        self.pop_up = MutableContextManager[Any]()
+        self.pop_up = MutableContextManager[Any](None) #type: ignore
     def draw(self, window: pygame.Surface, scale: float) -> None:
         self.board_info.draw(window, scale)
         self.board.draw(window, scale)
-        if pop_up:=self.pop_up.context:
+        if pop_up:=self.pop_up.value:
             pop_up.draw(window, scale)
 
     def on_win(self, board: engine.Board, winner: engine.Player) -> None:
@@ -281,7 +282,6 @@ class Game(Drawable, AutomaticStack):
                                  self.close_pop_up,
                                  Text(..., arial, 16+8, Color.BLACK, msg))))
     def close_pop_up(self) -> None:
-        self.pop_up.clear()
         self.board.enable()
         
     def reposition(self, position: Inferable[Point]) -> 'Game':
