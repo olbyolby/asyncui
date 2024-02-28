@@ -1,3 +1,26 @@
+"""
+This module holds class for representing pygame events, as well as an api for converted beween them.
+
+Classes:
+    Event - base class of all event types, automatically registers a new event type for mashalling
+    KeyDown - event sent when a key is pressed
+    KeyUp - event sent when a key is released
+    MouseButtonUp - event sent when a mouse button is released
+    MouseButtonDown - event sent when a mouse button is pressed
+    MouseWheelScroll - event sent when the mouse wheel is scrolled
+    MouseMove - event sent when the mouse moves
+    TextInput - event sent when text is inputed, includes special characters and modifier processing(So Shift+a results in 'A')
+    Quit - event sent when the X button is pressed
+    VideoResize - event sent when the video is resized
+Functions:
+    to_pygame_event - convert an event from asyncui to a pygame event, can be overridden for custom events, see `Event`
+    marshal - convert a pygame event to it's corresponding asyncui event, or None is no matching event type is found. Also see `Event`
+
+Submodules:
+    keyboard - enum class for keyboard values and modifiers keys
+    mouse - enum class for mouse keys
+"""
+
 from typing import Any, Self
 
 from . import keyboard, mouse

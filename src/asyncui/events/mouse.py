@@ -1,3 +1,9 @@
+"""
+Enumeration for mouse buttons
+
+Enums:
+    Button - You'll never guess
+"""
 import pygame
 from enum import Enum
 

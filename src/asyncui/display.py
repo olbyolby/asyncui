@@ -1,3 +1,20 @@
+"""
+This module defines classes and utilities for creating widgets
+
+Classes:
+    Color - represents a color, complatable with pygame's color format, and includes constants for common colors
+    Point - alais for tuple[int, int]
+    Size - alies for tuple[int, int]
+    Rect - alies for pygame.Rect
+    Drawable - base class for all drawables in asyncui
+    Scale - provides simplistic interface for scaling various elements by a scale factor
+    AutomaticStack - base class for all drawables which can handle and respond to events
+    Clip - context manager for automaticlly handling the application and replacement of a clipping area on a surface
+Functions:
+    stack_enabler - convince method for AutomaticStack's `enable` method, passes ExitStack as an argument and automatically sets `_stack`
+    renderer - convinience method for Drawable's `draw` method, passes a `Scale` object instead of a float scale factor
+    drawable_renderer - take a Drawable and return a function compatible with `asyncui.window.Window.start_rendering`
+"""
 import pygame
 from abc import ABC, abstractmethod
 from typing import Self, Iterable, Type, Callable, TypeVar, Iterator, Sequence, overload
@@ -163,14 +180,6 @@ def renderer(function: Callable[[T, pygame.Surface, Scale], None]) -> Callable[[
     def wrapper(self: T, window: pygame.Surface, scale: float) -> None:
         return function(self, window, Scale(scale))
     return wrapper
-
-def widget_renderer(function: Callable[[T], Iterable[Drawable]]) -> Callable[[T, pygame.Surface, float], None]:
-    @wraps(function)
-    def wrapper(self: T, window: pygame.Surface, scale: float) -> None:
-        for drawable in function(self):
-            drawable.draw(window, scale)
-    return wrapper
-
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
 def rescaler(function: Callable[[T, Scale], T]) -> Callable[[T, float], T]:

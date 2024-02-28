@@ -1,3 +1,10 @@
+"""
+Defines an Enumeration for ModifierKeys and Keys.
+
+Enums:
+    ModifierKeys: Enumeration of every modifier key
+    Keys: Enumeration of every Key with names
+"""
 import pygame
 import logging
 from enum import Enum, Flag
