@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "asyncui"
+version = "0.0.1"
+authors = [
+    { name = "Colby", email = "colby.butler.home@gmail.com" } 
+]
+description = "A widget system for pygame with support for asyncio"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
