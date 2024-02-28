@@ -1,3 +1,13 @@
+"""
+This module defines classses and utilites for working with "transformation functions", 
+which is any function with 1 argument and 1 return value.
+
+Classes:
+    Transformer - The class and decorator for transformer functions, provides convienience methods and operators
+
+Functions:
+    transformer_factory - Decorator for a function which returns other transformer functions
+"""
 from __future__ import annotations
 from typing import TypeVar, Generic, Callable, overload, Iterable, TypeVarTuple
 from functools import wraps, update_wrapper
@@ -5,7 +15,7 @@ from functools import wraps, update_wrapper
 
 __all__ = [
     'Transformer',
-    'transformerFactory'
+    'transformer_factory'
 ]
 T = TypeVar('T')
 T2 = TypeVar('T2')
@@ -14,8 +24,8 @@ Ts = TypeVarTuple('Ts')
 
 class Transformer(Generic[T, T2]):
     """
-    A wrapper for functions that transform values in the form y = f(x), adding many useful and mathmatical operations
-
+    A wrapper for functions that transform values in the form f(T) -> T2, adding many useful and mathmatical operations.
+    Any function with a single argument and 1 return value is a transformer function.
     Methods:
         compose(other) - compose 2 transformers, f.compose(g) == lambda x: f(g(x))
         feed(values) - feed a sequence of values to the fransformer, f.feed(values) == (f(value) for value in values)
@@ -73,7 +83,7 @@ class Transformer(Generic[T, T2]):
         """The >> operator, speficly value >> self. Is equivlent to self(value), also allows chaining via value >> transformA >> transformB >> etc"""
         return self(value)
         
-def transformerFactory(function: Callable[[*Ts], Callable[[T], T2]]) -> Callable[[*Ts], Transformer[T, T2]]:
+def transformer_factory(function: Callable[[*Ts], Callable[[T], T2]]) -> Callable[[*Ts], Transformer[T, T2]]:
     """
     Convert a function which returns functions into a function which returns transformers, g = f(*xs), y = g(x)
 

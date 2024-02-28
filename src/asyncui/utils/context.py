@@ -2,6 +2,8 @@ from typing import ContextManager, TypeVar, Generic
 from types import TracebackType
 
 T = TypeVar('T')
+
+__all__ = ['MutableContextManager']
 class MutableContextManager(Generic[T]):
     def __init__(self, inital_context: ContextManager[T]):
         self.context = inital_context

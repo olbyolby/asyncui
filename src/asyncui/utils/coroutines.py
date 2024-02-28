@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import ParamSpec, Literal, TypeVar, Generator, TypeVarTuple, Callable, Never, Iterable
+from typing import ParamSpec, Literal, TypeVar, Generator, TypeVarTuple, Callable, Never, Iterable, Final
 from functools import wraps
 from enum import Enum, auto
 
@@ -9,9 +9,10 @@ T3 = TypeVar('T3')
 Ts = TypeVarTuple('Ts')
 P = ParamSpec('P')
 
+__all__ = ("SkipState", "statefulFunction", "feed", "accumulate", "total")
 class Sentinals(Enum):
     SkipState = auto()
-SkipState = Sentinals.SkipState
+SkipState: Final = Sentinals.SkipState
 
 Stateful = Generator[T | Literal[Sentinals.SkipState], tuple[*Ts], Never]
 def statefulFunction(function: Callable[P, Generator[T | Literal[Sentinals.SkipState], tuple[*Ts], Never]]) -> Callable[P, Callable[[*Ts], T]]:

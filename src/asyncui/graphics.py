@@ -520,13 +520,13 @@ def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
     inner_position = (outter_center[0] - inner.size[0]//2, outter_center[1] - inner.size[1]//2)
     return inner.reposition(inner_position)    
 
-@transformers.transformerFactory
+@transformers.transformer_factory
 @coroutines.statefulFunction
 def overlap() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = base, = yield coroutines.SkipState
     while True:
         widget, = yield widget.reposition(base.position)
-@transformers.transformerFactory
+@transformers.transformer_factory
 @coroutines.statefulFunction
 def horizontal() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
@@ -534,7 +534,7 @@ def horizontal() -> coroutines.Stateful[Drawable, Drawable]:
     while True:
         widget, = yield widget.reposition((x_offset(widget.size[0]),widget.position[1]))
 
-@transformers.transformerFactory
+@transformers.transformer_factory
 @coroutines.statefulFunction
 def vertical() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = yield coroutines.SkipState
@@ -542,7 +542,7 @@ def vertical() -> coroutines.Stateful[Drawable, Drawable]:
     while True:
         widget, = yield widget.reposition((widget.position[0], y_offset(widget.size[1])))
 
-@transformers.transformerFactory
+@transformers.transformer_factory
 @coroutines.statefulFunction
 def concentric() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = base, =  yield coroutines.SkipState

@@ -4,6 +4,7 @@ from types import EllipsisType
 T = TypeVar('T')
 T2 = TypeVar('T2')
 
+__all__ = ("Inferable", "Placeholder")
 class Placeholder(Generic[T]):
     def __init__(self, default: T, name: str | None = None):
         self.name: str | None = name
