@@ -8,12 +8,11 @@ Classes:
     Window - The core of any asyncUi program, manages the event loop and rendering. Also a Singleton
     EventHandler - An event handler for pygame events, avaliable as a decorator via `eventHandler`
     MethodEventHandler - Similar to `EventHandler`, but for class/unbound functions, constructed via `eventHandlerMethod 
-    Renderer - A running renderer, renders to the screen asynchronously and maintains FPS
 
 Functions:
 
-    eventHandler - decorator, creates an `EventHandler` from a function. Supports infering event type form type hints.
-    eventHandlerMethod - creates a `MethodEventHandler`, also supports infering the event type.
+    event_handler - decorator, creates an `EventHandler` from a function. Supports infering event type form type hints.
+    event_handler_method - creates a `MethodEventHandler`, also supports infering the event type.
 
 """
 import pygame
@@ -39,7 +38,7 @@ Ts = TypeVarTuple('Ts')
 EventT = TypeVar("EventT", bound=events.Event)
 
 
-
+__all__ = ('EventHandler', 'EventHandlerMethod', 'event_handler', 'event_handler_method', 'Window', 'Renderer')
 class EventHandler(Generic[EventT]):
     """
     Manages registrating and unregistrating of event handlers for the current window
@@ -88,13 +87,13 @@ def event_handler(event_type: Type[EventT] | Callable[[EventT], None]) -> Callab
     Examples:
 
         #Defines an event handler, the event type is inferred from the type hint
-        @eventHandler
+        @event_handler
         def printKey(event: events.KeyDown):
             print(event.unicode)
 
         #Also defines an event handler, but explicity gives the event type
         #This is useful in code bases without type hints or for using arbitrary functions
-        @eventHandler(events.KeyDown)
+        @event_handler(events.KeyDown)
         def printKey(event):
             print(event.unicode)
     """
@@ -172,12 +171,12 @@ def event_handler_method(handler_or_type: Type[EventT] | Callable[[T, EventT], N
             def __init__(self, value: int) -> None:
                 self.value = value
             #explicitly provide the event type
-            @eventHandlerMethod(events.KeyDown)
+            @event_handler_method(events.KeyDown)
             def keyDownHandler(self, event: events.KeyDown) -> None:
                 print("value is: ", self.value, ", key down is: ", event.unicode)
             
             #implicitly infer the event type
-            @eventHandlerMethod
+            @event_handler_method
             def keyUpHandler(self, event: events.KeyUp) -> None:
                 print("value is: ", self.value, ", key up is: ", event.unicode)
         
@@ -345,14 +344,14 @@ class Window(asyncio.AbstractEventLoop):
     
     Methods:
 
-        registerEventHandler - register an event handler for the given event type
-        unregisterEventHandler - unregister an event handler for the given event type, throws if that handler is not registered
-        isEventHandlerRegistered - returns wether or not the given event handler is registered for the given event type
-        postEvent - post a pygame or asyncui event to the pygame event queue
-        getEvent - asyncshrnously await for the next event of given type
+        register_event_handler - register an event handler for the given event type
+        unregister_event_handler - unregister an event handler for the given event type, throws if that handler is not registered
+        is_event_handler_registered - returns wether or not the given event handler is registered for the given event type
+        post_event - post a pygame or asyncui event to the pygame event queue
+        get_event - asyncshrnously await for the next event of given type
 
-        scaleFactor - Returns the scale factor between the current window size and it's initial size
-        startRenderer - Takes a render function an FPS and returns a `Renderer` instance, raises if a renderer is already running
+        scale_factor - Returns the scale factor between the current window size and it's initial size
+        start_renderer - Takes a render function an FPS and returns a `Renderer` instance, raises if a renderer is already running
 
         run - run the event loop forever
 
