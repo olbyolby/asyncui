@@ -2,7 +2,7 @@
 from asyncui.window import Window, event_handler
 from asyncui.graphics import Text, Group, Box
 from asyncui.display import Color, drawable_renderer
-from asyncui.resources.fonts import font_manager
+from asyncui.resources.fonts import fonts
 from asyncui import events
 import pygame
 import sys
@@ -15,7 +15,7 @@ pygame.init()
 window = Window(pygame.display.set_mode((250, 100), pygame.RESIZABLE), (500, 200), "Hello world: asyncui")
 
 # Load a font to render to window with, in this case, arial is used.
-arial = font_manager.load_system_font('arial')
+arial = fonts.load_system_font('arial')
 
 # By default, the "X" button will do nothing, so an event handler is made to call exit() when "X" is pressed.
 @event_handler

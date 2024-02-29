@@ -1,13 +1,13 @@
 from asyncui.window import Window, event_handler
 from asyncui.events import Quit, MouseButtonUp
-from asyncui.resources.fonts import font_manager
+from asyncui.resources.fonts import fonts
 from asyncui.graphics import Box, Button, Text
 from asyncui.display import Color, drawable_renderer
 import pygame
 pygame.init()
 
 window = Window(pygame.display.set_mode((300, 200)), (300, 200), "Example window")
-arial = font_manager.load_system_font("arial")
+arial = fonts.load_system_font("arial")
 
 @event_handler
 def closer(e: Quit) -> None:
