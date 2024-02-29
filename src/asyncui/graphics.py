@@ -449,13 +449,16 @@ class Circle(Drawable):
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.circle(window, self.color, scale.point(add_point(self.position, (self.radius, self.radius))), self.radius*scale.scale_factor, int(self.thickness*scale.scale_factor))
+        scaled_radius = scale.length(self.radius)
+        position = scale.point(self.position)
+        center = add_point(position, (scaled_radius//2, scaled_radius//2))
+        pygame.draw.circle(window, self.color, center, scaled_radius, scale.length(self.thickness))
 
     def reposition(self, position: Point | EllipsisType) -> Circle:
         return Circle(position, self.color, self.radius, self.thickness)
     
     def get_size(self) -> Size:
-        return (self.radius, self.radius)
+        return (self.radius*2, self.radius*2)
     size = cached_property[Size](get_size)
 
 class Button(Drawable, AutomaticStack):
