@@ -482,39 +482,33 @@ class Button(Drawable, AutomaticStack):
 
     def reposition(self, position: Point | EllipsisType) -> 'Button':
         return Button(position, self.widget, self.clicked)
-    
-class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
+
+class OptionBar(Drawable, AutomaticStack):
     size = Placeholder[Size]((0,0))
-    def __init__(self, position: Inferable[Point], size: Size, color: Color, title: Text, close: Callback[()], inside: DrawableT) -> None:
+    def __init__(self, position: Inferable[Point], size: Size, options: Sequence[Drawable]):
         self.position = position
         self.size = size
-
-        self.background = Box(position, size, color)
-        self.title = title.reposition(position)
-        self.screen = inside.reposition(... if position is ... else add_point(position, (0,self.title.height)))
-        self.close = CallbackWrapper(close)
+        if position is ...:
+            self.options = options
+        else:
+            self.options = list(horizontal() @ match_x(position[0]) @ options)
     
-    @cached_property
-    def exit_button(self) -> Button:
-        size = self.size
-        return Button(add_point(self.position, (size[0]-size[0]//8, 0)), Box(..., (size[0]//8, self.title.height), Color(255, 0, 0)), self.close)
-   
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        with Clip(window, self.body):
+            for option in self.options:
+                option.draw(window, scale)
+    
     @stack_enabler
     def enable(self, stack: ExitStack) -> None:
-        stack.enter_context(self.exit_button)
-        if isinstance(self.screen, AutomaticStack):
-            stack.enter_context(self.screen)
-
-    def draw(self, window: pygame.Surface, scale: float) -> None:
-        self.background.draw(window, scale)
-        self.title.draw(window, scale)
-        self.exit_button.draw(window, scale)
-        self.screen.draw(window, scale)
-
-    def reposition(self, position: Inferable[Point]) -> 'MenuWindow[DrawableT]':
-        return MenuWindow(position, self.size, self.background.color, self.title, self.close, self.screen)
-
-
+        for option in self.options:
+            if isinstance(option, AutomaticStack):
+                option.enable()
+        
+    def reposition(self, position: Inferable[Point]) -> 'OptionBar':
+        return OptionBar(position, self.size, self.options)
+    def change_options(self, options: Sequence[Drawable]) -> 'OptionBar':
+        return OptionBar(self.position, self.size, self.options)
+    
 
 # Some useful positioner functions
 
@@ -523,6 +517,18 @@ def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
     inner_position = (outter_center[0] - inner.size[0]//2, outter_center[1] - inner.size[1]//2)
     return inner.reposition(inner_position)    
 
+@transformers.transformer_factory
+@coroutines.statefulFunction
+def match_x(x: int) -> coroutines.Stateful[Drawable, Drawable]:
+    widget, = yield coroutines.SkipState
+    while True:
+        widget, = yield widget.reposition((x, widget.position[1]))
+@transformers.transformer_factory
+@coroutines.statefulFunction
+def match_y(y: int) -> coroutines.Stateful[Drawable, Drawable]:
+    widget, = yield coroutines.SkipState
+    while True:
+        widget, = yield widget.reposition((widget.position[0], y))
 @transformers.transformer_factory
 @coroutines.statefulFunction
 def overlap() -> coroutines.Stateful[Drawable, Drawable]:
