@@ -61,7 +61,7 @@ class FontManager:
         return FontSizeManager(font_name, pygame.font.Font)
         
     def load_system_font(self, font_name: str) -> FontSizeManager:
-        if font_name not in self.loaded_fonts:
+        if font_name in self.loaded_fonts:
             return self.loaded_fonts[font_name]
         return FontSizeManager(font_name, pygame.font.SysFont)
     

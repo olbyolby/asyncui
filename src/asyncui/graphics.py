@@ -1,7 +1,7 @@
 from __future__ import annotations
 from types import EllipsisType
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stack_enabler, renderer, Clip, rescaler
-from typing import TypeVar, Iterable, Final, Callable, Sequence, Generic
+from typing import TypeVar, Iterable, Final, Callable, Sequence, cast
 from functools import cached_property
 from .resources.fonts import Font
 from contextlib import ExitStack
@@ -10,6 +10,8 @@ from .window import event_handler_method, Window
 from .utils import coroutines, transformers
 from .utils.callbacks import Callback, CallbackWrapper
 from .utils.descriptors import Placeholder, Inferable
+from .utils.context import MutableContextManager
+import itertools
 import pygame
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
@@ -463,11 +465,11 @@ class Circle(Drawable):
 
 class Button(Drawable, AutomaticStack):
     size = Placeholder[Size]((0,0))
-    def __init__(self, position: Inferable[Point], widget: Drawable, on_click: Callback[()]) -> None:
+    def __init__(self, position: Inferable[Point], widget: Drawable, on_click: Inferable[Callback[()]]) -> None:
         self.position = position
         self.widget = widget.reposition(position)
         self.size = widget.size
-        self.clicked = CallbackWrapper(on_click)
+        self.clicked = CallbackWrapper(on_click if on_click is not ... else None)
 
     @cached_property[Clickable]
     def _clicker(self) -> Clickable:
@@ -482,6 +484,10 @@ class Button(Drawable, AutomaticStack):
 
     def reposition(self, position: Point | EllipsisType) -> 'Button':
         return Button(position, self.widget, self.clicked)
+    def change_widget(self, widget: Drawable) -> 'Button':
+        return Button(self.position, widget, self.clicked)
+    def change_callback(self, on_click: Inferable[Callback[()]]) -> 'Button':
+        return Button(self.position, self.widget, on_click)
 
 class OptionBar(Drawable, AutomaticStack):
     size = Placeholder[Size]((0,0))
@@ -491,12 +497,11 @@ class OptionBar(Drawable, AutomaticStack):
         if position is ...:
             self.options = options
         else:
-            self.options = list(horizontal() @ match_x(position[0]) @ options)
+            self.options = list(horizontal() @ match_y(position[1]) @ options)
     
     def draw(self, window: pygame.Surface, scale: float) -> None:
-        with Clip(window, self.body):
-            for option in self.options:
-                option.draw(window, scale)
+        for option in self.options:
+            option.draw(window, scale)
     
     @stack_enabler
     def enable(self, stack: ExitStack) -> None:
@@ -508,8 +513,41 @@ class OptionBar(Drawable, AutomaticStack):
         return OptionBar(position, self.size, self.options)
     def change_options(self, options: Sequence[Drawable]) -> 'OptionBar':
         return OptionBar(self.position, self.size, self.options)
-    
 
+class OptionMenu(Drawable, AutomaticStack):
+    size = Placeholder[Size]((0,0))
+    def __init__(self, position: Inferable[Point], size: Size, switch: Button, options: Sequence[Drawable], open: bool = False):
+        self.position = position
+        self.size = size
+
+        align = vertical()
+        self.switch = cast(Button, align(switch.reposition(self.position))).change_callback(self._close_or_open)
+        if position is ...:
+            self.options = options
+        else:
+            self.options = list(align @ match_x(position[0]) @ options)
+        self.open = open
+
+    def _close_or_open(self) -> None:
+        for option in self.options:
+            if isinstance(option, AutomaticStack):
+                if self.open is True:
+                    option.disable()
+                else:
+                    option.enable()
+        self.open = not self.open
+
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        self.switch.draw(window, scale)
+        if self.open is True:
+            for option in self.options:
+                option.draw(window, scale)
+    @stack_enabler
+    def enable(self, stack: ExitStack) -> None:
+        self.switch.enable()
+
+    def reposition(self, position: Inferable[Point]) -> 'OptionMenu':
+        return OptionMenu(position, self.size, self.switch, self.options)
 # Some useful positioner functions
 
 def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
