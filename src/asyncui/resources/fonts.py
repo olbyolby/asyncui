@@ -71,6 +71,5 @@ class FontManager:
         return self.loaded_fonts[font_name]
     def __delitem__(self, font_name: str) -> None:
         del self.loaded_fonts[font_name]
-fonts = FontManager(pygame.font.Font)
 
 Font = FontSizeManager

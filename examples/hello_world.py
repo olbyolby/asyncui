@@ -2,7 +2,7 @@
 from asyncui.window import Window, event_handler
 from asyncui.graphics import Text, Group, Box
 from asyncui.display import Color, drawable_renderer
-from asyncui.resources.fonts import fonts
+from asyncui.resources.fonts import FontManager
 from asyncui import events
 import pygame
 import sys
@@ -13,6 +13,9 @@ pygame.init()
 # The window has a size of (250, 100), but a UI size of (500, 200), and a title of "Hello world: asyncui".
 # UI elements are automatically scaled to the window size from the UI size.
 window = Window(pygame.display.set_mode((250, 100), pygame.RESIZABLE), (500, 200), "Hello world: asyncui")
+
+# Create a font loader, it handles the loading of fonts
+fonts = FontManager()
 
 # Load a font to render to window with, in this case, arial is used.
 arial = fonts.load_system_font('arial')
