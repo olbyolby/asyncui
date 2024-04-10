@@ -1,7 +1,7 @@
 from __future__ import annotations
 from types import EllipsisType
 from .display import Color, Size, Point, Drawable, Scale, AutomaticStack, stack_enabler, renderer, Clip, rescaler
-from typing import TypeVar, Iterable, Final, Callable, Sequence, Generic
+from typing import TypeVar, Iterable, Final, Callable, Sequence, cast, Generic, Iterator
 from functools import cached_property
 from .resources.fonts import Font
 from contextlib import ExitStack
@@ -10,9 +10,12 @@ from .window import event_handler_method, Window
 from .utils import coroutines, transformers
 from .utils.callbacks import Callback, CallbackWrapper
 from .utils.descriptors import Placeholder, Inferable
+from .utils.context import MutableContextManager
+import itertools
 import pygame
 
 DrawableT = TypeVar('DrawableT', bound=Drawable)
+DrawableT2 = TypeVar('DrawableT2', bound=Drawable)
 
 def render_all(window: pygame.Surface, scale: float, *targets: Drawable) -> None:
     for target in targets:
@@ -417,14 +420,14 @@ class Line(Drawable):
     def change_point(self, start: Inferable[Point], end: Inferable[Point]) -> Line:
         return Line(self.position, self.color, self.thickness, self.start if start is ... else start, self.end if end is ... else end)
 
-class Group(Drawable, AutomaticStack):
-    def __init__(self, position: Inferable[Point], widgets: Iterable[Drawable]) -> None:
+class Group(Drawable, AutomaticStack, Generic[DrawableT]):
+    def __init__(self, position: Inferable[Point], widgets: Iterable[DrawableT]) -> None:
         self.position = position
         self.widgets = [widget.reposition(add_point(self.position,widget.position)) for widget in widgets]
     def draw(self, window: pygame.Surface, scale: float) -> None:
         for widget in self.widgets:
             widget.draw(window, scale)
-    def reposition(self, position: Inferable[Point]) -> 'Group':
+    def reposition(self, position: Inferable[Point]) -> 'Group[DrawableT]':
         return Group(position, (widget.reposition((widget.position[0] - self.position[0], widget.position[1] - self.position[1])) for widget in self.widgets))
     @stack_enabler
     def enable(self, stack: ExitStack) -> None:
@@ -439,7 +442,13 @@ class Group(Drawable, AutomaticStack):
             max_y = max(widget.position[1] + widget.size[1], max_y)
         return max_x - self.position[0], max_y - self.position[1]
     size = cached_property(get_size)
-   
+
+    def __iter__(self) -> Iterator[DrawableT]:
+        return iter(self.widgets)
+    def __len__(self) -> int:
+        return len(self.widgets)
+    
+
 class Circle(Drawable):
     def __init__(self, position: Inferable[Point], color: Color, radius: int, thickness: int = 0) -> None:
         self.position = position
@@ -449,22 +458,25 @@ class Circle(Drawable):
     
     @renderer
     def draw(self, window: pygame.Surface, scale: Scale) -> None:
-        pygame.draw.circle(window, self.color, scale.point(add_point(self.position, (self.radius, self.radius))), self.radius*scale.scale_factor, int(self.thickness*scale.scale_factor))
+        scaled_radius = scale.length(self.radius)
+        position = scale.point(self.position)
+        center = add_point(position, (scaled_radius//2, scaled_radius//2))
+        pygame.draw.circle(window, self.color, center, scaled_radius, scale.length(self.thickness))
 
     def reposition(self, position: Point | EllipsisType) -> Circle:
         return Circle(position, self.color, self.radius, self.thickness)
     
     def get_size(self) -> Size:
-        return (self.radius, self.radius)
+        return (self.radius*2, self.radius*2)
     size = cached_property[Size](get_size)
 
-class Button(Drawable, AutomaticStack):
+class Button(Drawable, AutomaticStack, Generic[DrawableT]):
     size = Placeholder[Size]((0,0))
-    def __init__(self, position: Inferable[Point], widget: Drawable, on_click: Callback[()]) -> None:
+    def __init__(self, position: Inferable[Point], widget: DrawableT, on_click: Inferable[Callback[()]]) -> None:
         self.position = position
         self.widget = widget.reposition(position)
         self.size = widget.size
-        self.clicked = CallbackWrapper(on_click)
+        self.clicked = CallbackWrapper(on_click if on_click is not ... else None)
 
     @cached_property[Clickable]
     def _clicker(self) -> Clickable:
@@ -477,42 +489,102 @@ class Button(Drawable, AutomaticStack):
     def draw(self, window: pygame.Surface, scale: float) -> None:
         self.widget.draw(window, scale)
 
-    def reposition(self, position: Point | EllipsisType) -> 'Button':
+    def reposition(self, position: Point | EllipsisType) -> 'Button[DrawableT]':
         return Button(position, self.widget, self.clicked)
-    
-class MenuWindow(Drawable, AutomaticStack, Generic[DrawableT]):
+    def change_widget(self, widget: DrawableT) -> 'Button[DrawableT]':
+        return Button(self.position, widget, self.clicked)
+    def change_callback(self, on_click: Inferable[Callback[()]]) -> 'Button[DrawableT]':
+        return Button(self.position, self.widget, on_click)
+
+class OptionBar(Drawable, AutomaticStack, Generic[DrawableT]):
     size = Placeholder[Size]((0,0))
-    def __init__(self, position: Inferable[Point], size: Size, color: Color, title: Text, close: Callback[()], inside: DrawableT) -> None:
+    def __init__(self, position: Inferable[Point], size: Size, options: Sequence[DrawableT]):
+        self.position = position
+        self.size = size
+        if position is ...:
+            self.options = options
+        else:
+            self.options = cast(Sequence[DrawableT], list(horizontal() @ match_y(position[1]) @ options))
+    
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        for option in self.options:
+            option.draw(window, scale)
+    
+    @stack_enabler
+    def enable(self, stack: ExitStack) -> None:
+        for option in self.options:
+            if isinstance(option, AutomaticStack):
+                option.enable()
+        
+    def reposition(self, position: Inferable[Point]) -> 'OptionBar[DrawableT]':
+        return OptionBar(position, self.size, self.options)
+    def change_options(self, options: Sequence[DrawableT]) -> 'OptionBar[DrawableT]':
+        return OptionBar(self.position, self.size, self.options)
+
+class OptionMenu(Drawable, AutomaticStack, Generic[DrawableT]):
+    size = Placeholder[Size]((0,0))
+    def __init__(self, position: Inferable[Point], size: Size, switch: Button[DrawableT], options: Sequence[Drawable], open: bool = False):
         self.position = position
         self.size = size
 
-        self.background = Box(position, size, color)
-        self.title = title.reposition(position)
-        self.screen = inside.reposition(... if position is ... else add_point(position, (0,self.title.height)))
-        self.close = CallbackWrapper(close)
-    
-    @cached_property
-    def exit_button(self) -> Button:
-        size = self.size
-        return Button(add_point(self.position, (size[0]-size[0]//8, 0)), Box(..., (size[0]//8, self.title.height), Color(255, 0, 0)), self.close)
-   
-    @stack_enabler
-    def enable(self, stack: ExitStack) -> None:
-        stack.enter_context(self.exit_button)
-        if isinstance(self.screen, AutomaticStack):
-            stack.enter_context(self.screen)
+        align = vertical()
+        self.switch = cast(Button[DrawableT], align(switch.reposition(self.position))).change_callback(self._close_or_open)
+        if position is ...:
+            self.options = options
+        else:
+            self.options = list(align @ match_x(position[0]) @ options)
+        self.open = open
+
+    def _close_or_open(self) -> None:
+        for option in self.options:
+            if isinstance(option, AutomaticStack):
+                if self.open is True:
+                    option.disable()
+                else:
+                    option.enable()
+        self.open = not self.open
 
     def draw(self, window: pygame.Surface, scale: float) -> None:
-        self.background.draw(window, scale)
-        self.title.draw(window, scale)
-        self.exit_button.draw(window, scale)
-        self.screen.draw(window, scale)
+        self.switch.draw(window, scale)
+        if self.open is True:
+            for option in self.options:
+                option.draw(window, scale)
+    @stack_enabler
+    def enable(self, stack: ExitStack) -> None:
+        self.switch.enable()
 
-    def reposition(self, position: Inferable[Point]) -> 'MenuWindow[DrawableT]':
-        return MenuWindow(position, self.size, self.background.color, self.title, self.close, self.screen)
+    def reposition(self, position: Inferable[Point]) -> 'OptionMenu[DrawableT]':
+        return OptionMenu(position, self.size, self.switch, self.options)
 
+class Visable(Drawable, AutomaticStack, Generic[DrawableT]):
+    size = Placeholder[Size]((0,0))
+    def __init__(self, position: Inferable[Point], widget: DrawableT, shown: bool) -> None:
+        self.position = position
+        self.widget = widget.reposition(position)
+        self.size = self.widget.size
 
-
+        self.is_shown = shown
+    
+    def draw(self, window: pygame.Surface, scale: float) -> None:
+        if self.is_shown:
+            self.widget.draw(window, scale)
+    def reposition(self, position: Inferable[Point]) -> 'Visable[DrawableT]':
+        return Visable(position, self.widget, self.is_shown)
+    def change_widget(self, widget: DrawableT) -> 'Visable[DrawableT]':
+        return Visable(self.position, self.widget, self.is_shown)
+    def set_visability(self, shown: bool) -> "Visable[DrawableT]":
+        return Visable(self.position, self.widget, shown) 
+    def shown(self) -> 'Visable[DrawableT]':
+        return self.set_visability(True)
+    def hidden(self) -> 'Visable[DrawableT]':
+        return self.set_visability(False)
+    def swap_visibility(self) -> 'Visable[DrawableT]':
+        return self.set_visability(not self.is_shown)
+    
+    @stack_enabler
+    def enable(self, stack: ExitStack) -> None:
+        if self.is_shown and isinstance(self.widget, AutomaticStack):
+            stack.enter_context(self.widget)
 # Some useful positioner functions
 
 def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
@@ -520,6 +592,20 @@ def centered(outter: Drawable, inner: DrawableT) -> DrawableT:
     inner_position = (outter_center[0] - inner.size[0]//2, outter_center[1] - inner.size[1]//2)
     return inner.reposition(inner_position)    
 
+
+    
+@transformers.transformer_factory
+@coroutines.statefulFunction
+def match_x(x: int) -> coroutines.Stateful[Drawable, Drawable]:
+    widget, = yield coroutines.SkipState
+    while True:
+        widget, = yield widget.reposition((x, widget.position[1]))
+@transformers.transformer_factory
+@coroutines.statefulFunction
+def match_y(y: int) -> coroutines.Stateful[Drawable, Drawable]:
+    widget, = yield coroutines.SkipState
+    while True:
+        widget, = yield widget.reposition((widget.position[0], y))
 @transformers.transformer_factory
 @coroutines.statefulFunction
 def overlap() -> coroutines.Stateful[Drawable, Drawable]:
@@ -548,4 +634,5 @@ def concentric() -> coroutines.Stateful[Drawable, Drawable]:
     widget, = base, =  yield coroutines.SkipState
     while True:
         widget, = yield centered(base, widget)
+
 

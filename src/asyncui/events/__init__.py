@@ -91,6 +91,8 @@ class Event:
             if name == 'type': #type is a speical case
                 continue
 
+            if name not in event_data:
+                raise ValueError(f"Event {event} is missing the required attribute '{name}' to construct {type(new_event)}('{name}' has type {attr_type})")
             if isinstance(attr_type, type) and issubclass(attr_type, Enum | Flag):
                 vars(new_event)[name] = attr_type(event_data[name])
             else:
@@ -114,7 +116,7 @@ class Event:
                     clean_vars[name] = value.value
                 else:
                     clean_vars[name] = value
-            return pygame.event.Event(self.type, vars(self))
+            return pygame.event.Event(self.type, clean_vars)
         
     def __init_subclass__(cls, **kwargs: Any) -> None:
         # If no type is specified, create a new custom type
